@@ -51,11 +51,25 @@ describe("the ball's Markdown", () => {
       "* a *",
       "a * b * c",
       "**x**y**z**",
-      "*a*b*c*"
+      "*a*b*c*",
+      "**a _b** c_",
+      "_**_**",
+      "__a *b__ c*",
+      "_a **b_ c**",
+      "*a __b* c__",
+      "__**x**__ and _*y*_"
     ]) {
       const html = renderMarkdown(s);
       expect(balanced(html), `${s} → ${html}`).toBe(true);
     }
+  });
+
+  it("never lets an underscore span cross a star one", () => {
+    expect(renderMarkdown("**a _b** c_")).toBe("<p><strong>a _b</strong> c_</p>");
+    expect(renderMarkdown("_**_**")).toBe("<p>_<strong>_</strong></p>");
+    expect(renderMarkdown("_plain_ and __plain__")).toBe(
+      "<p><em>plain</em> and <strong>plain</strong></p>"
+    );
   });
 
   it("leaves underscores inside words and lone asterisks alone", () => {

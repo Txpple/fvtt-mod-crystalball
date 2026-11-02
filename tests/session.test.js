@@ -113,9 +113,19 @@ describe("the line a failure shows", () => {
     expect(failureOf(502, "<html>")).toEqual({ key: "status", status: 502 });
   });
 
-  it("reads a stream's error event by its code", () => {
+  it("reads a stream's error event by its code, worded as the same status would be", () => {
     expect(failureOf(0, { error: "dark", reason: "model", message: "timeout" })).toEqual({
       key: "dark.model"
+    });
+    expect(failureOf(0, { error: "dark", reason: "world-closed", message: "closed" })).toEqual(
+      failureOf(503, { error: "dark", reason: "world-closed" })
+    );
+    expect(
+      failureOf(0, { error: "limit", scope: "table-day", retryAfter: 3600, message: "cap" })
+    ).toEqual(failureOf(429, { error: "limit", scope: "table-day", retryAfter: 3600 }));
+    expect(failureOf(0, { error: "limit", scope: "day", retryAfter: 60 })).toEqual({
+      key: "limit.day",
+      retryAfter: 60
     });
     expect(failureOf(0, { error: "seer", message: "unreadable" })).toEqual({
       key: "seer",

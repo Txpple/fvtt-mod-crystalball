@@ -77,6 +77,8 @@ http
     const tokens = Math.ceil(message.length / 4);
     event("meta", { sittingId: sitting.id, model: "stub", gazeTokens: 0, layers: { instructions: 0, lore: 0, party: 0, own: 0 } });
     for (let i = 0; i < text.length && !gone; i += 16) {
+      // A heartbeat that is not JSON, mid-answer: the window must read past it.
+      if (i === 32) res.write("event: ping\ndata: keep-alive\n\n");
       event("delta", { text: text.slice(i, i + 16) });
       await sleep(20);
     }

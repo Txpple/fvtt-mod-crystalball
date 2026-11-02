@@ -16,8 +16,6 @@ import { log, MODULE_ID, setting, t } from "./common.js";
 import { DEFAULT_SERVICE_URL } from "./decide/session.js";
 import { CrystalBallWindow } from "./window.js";
 
-export { MODULE_ID, log, t, setting };
-
 const BUTTON_ID = "crystalball-button";
 
 /** Clue Board's spy button: the ball sits right after it when it is there. */

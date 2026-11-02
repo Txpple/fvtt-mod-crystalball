@@ -7,14 +7,14 @@
  * world is out of reach the ball is dark and says why.
  *
  * What the ball says is drawn by decide/markdown.js over escaped text; what the player typed is
- * escaped by the template. Neither is ever enriched.
+ * escaped by the template. Neither is ever enriched. The window opens nothing of its own, so it
+ * carries no host helper: Foundry's own Detach moves it, and nothing follows it.
  */
 
 import { log, MODULE_ID, setting, t } from "./common.js";
 import { renderMarkdown } from "./decide/markdown.js";
 import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceBase, sessionIdFrom, waitOf } from "./decide/session.js";
 import { createSseParser } from "./decide/sse.js";
-import { watchHost } from "./host.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -32,12 +32,13 @@ const PAINT_MS = 50;
 /* -------------------------------------------------- */
 
 /**
- * The caller's Foundry session id: the `session` cookie, read as Foundry's `getCookies()` reads it.
- * Foundry 14 sets that cookie HttpOnly, so `document.cookie` never holds it there; the id Foundry's
- * own socket was handed at connect (its `session` event) is the same value, and stands in.
+ * The caller's Foundry session id: the one Foundry handed this client's own socket at connect
+ * (its `session` event). Foundry 14 sets the `session` cookie HttpOnly, so `document.cookie` never
+ * holds it; the cookie, read as Foundry's `getCookies()` reads it, is only the older builds'
+ * fallback. The two are the same value.
  */
 function sessionId() {
-  return sessionIdFrom(document.cookie) ?? game.socket?.session?.sessionId ?? null;
+  return game.socket?.session?.sessionId ?? sessionIdFrom(document.cookie);
 }
 
 /** An endpoint's URL, or null when the Service URL setting names no http(s) service. */
@@ -74,7 +75,10 @@ async function call(path, { method = "GET", body } = {}) {
   }
 }
 
-/** The line a failed call or a stream's error event shows, from lang. */
+/**
+ * The line a failed call or a stream's error event shows, from lang. A mid-stream `error` carries
+ * the same `reason`, `scope` and `retryAfter` as the status bodies, so it reads the same.
+ */
 function failureLine(status, body) {
   if (!status && !body) return t("errors.network");
   const f = failureOf(status, body);
@@ -87,12 +91,21 @@ function failureLine(status, body) {
   });
 }
 
+/** The one sitting change in flight, so a double click (or the API beside a click) posts once. */
+let posting = null;
+
 /** Close the open sitting and open a fresh one: the new sitting's `{ id, startedAt }`, or null. */
-async function postNewSitting() {
-  const res = await call("sittings/new", { method: "POST" });
-  if (res.ok) return res.body ?? {};
-  ui.notifications.warn(failureLine(res.status, res.body));
-  return null;
+function postNewSitting() {
+  posting ??= (async () => {
+    const res = await call("sittings/new", { method: "POST" });
+    if (res.ok) return res.body ?? {};
+    // Foundry cleans a notification rather than escaping it, and a 500's message is the Seer's text.
+    ui.notifications.warn(foundry.utils.escapeHTML(failureLine(res.status, res.body)));
+    return null;
+  })().finally(() => {
+    posting = null;
+  });
+  return posting;
 }
 
 /* -------------------------------------------------- */
@@ -113,18 +126,22 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   };
 
   static PARTS = {
-    main: { template: `modules/${MODULE_ID}/templates/window.hbs` }
+    // The transcript keeps its scroll through a redraw; _onRender moves it only for a reader at the end.
+    main: { template: `modules/${MODULE_ID}/templates/window.hbs`, scrollable: [".crystalball-transcript"] }
   };
 
   /** The one window, so the button and the API reuse it. */
   static current = null;
 
-  /** Open the window centred, or bring it to the front when it is already open. */
+  /**
+   * Open the window centred, or show it when it is already open: a minimized one is restored
+   * first, and a detached one's own browser window takes the focus.
+   */
   static open() {
     CrystalBallWindow.current ??= new CrystalBallWindow();
     const app = CrystalBallWindow.current;
     if (app.rendered) {
-      app.bringToFront();
+      void app.maximize().then(() => app.bringToFront());
       return app;
     }
     void app.render({ force: true });
@@ -166,14 +183,18 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   #paintTimer = null;
   /** Just opened: the input takes the focus once it is usable. */
   #wantFocus = false;
+  /** The next redraw ends at the bottom whatever the scroll (a question sent, a sitting loaded). */
+  #toBottom = true;
+  /** Whether this redraw ends at the bottom: decided before the old transcript goes. */
+  #stick = true;
+  /** The New sitting in flight. */
+  #renewing = null;
 
   /** @override */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const loading = this.#phase === "loading";
     const dark = this.#phase === "dark";
-    const day = this.#usage?.user?.day;
-    const max = this.#usage?.limits?.perUserDay;
     const you = game.user.character?.name ?? game.user.name ?? t("turn.you");
     const length = this.#draft.length;
     return Object.assign(context, {
@@ -181,7 +202,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       dark,
       darkLine: this.#darkLine,
       model: this.#model ?? t(dark ? "status.dark" : "status.loading"),
-      count: Number.isFinite(day) && Number.isFinite(max) ? t("status.count", { n: day, max }) : "",
+      count: this.#countLine(),
       intro: !loading && !dark && !this.#turns.length,
       turns: this.#turns.map(turn => ({
         user: turn.role === "user",
@@ -196,8 +217,14 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       over: length > MESSAGE_LIMIT,
       inputOff: loading || dark,
       sendOff: !this.#canSend(),
-      newOff: loading || dark || this.#busy
+      newOff: loading || dark || this.#busy || !!this.#renewing
     });
+  }
+
+  #countLine() {
+    const day = this.#usage?.user?.day;
+    const max = this.#usage?.limits?.perUserDay;
+    return Number.isFinite(day) && Number.isFinite(max) ? t("status.count", { n: day, max }) : "";
   }
 
   #counter(length) {
@@ -212,10 +239,16 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   /** @override */
   _onFirstRender(context, options) {
     super._onFirstRender(context, options);
-    // What this window opens (a dialog, a sheet) follows it into a detached window.
-    watchHost(this);
     this.#wantFocus = true;
     void this.reload();
+  }
+
+  /** @override */
+  async _preRender(context, options) {
+    await super._preRender(context, options);
+    // A reader who scrolled up to read is left where they are; one at the end follows the end.
+    this.#stick = this.#toBottom || this.#atBottom();
+    this.#toBottom = false;
   }
 
   /** @override */
@@ -243,13 +276,24 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
         area.setSelectionRange(area.value.length, area.value.length);
       }
     }
-    this.#scrollDown();
+    if (this.#stick) this.#scrollDown();
   }
 
   /** @override */
   _onClose(options) {
     super._onClose(options);
     // Closing ends the sitting's open answer: the Seer aborts the model call when the stream drops.
+    // The next open starts from loading, never from what this one last showed.
+    this.#abandon();
+    this.#phase = "loading";
+    this.#toBottom = true;
+  }
+
+  /**
+   * Drop whatever answer is in flight: a later reply to it is ignored (the generation moves on),
+   * its stream is aborted, and a ball turn left waiting stops pulsing and says it was cut.
+   */
+  #abandon() {
     this.#gen++;
     this.#abort?.abort();
     this.#abort = null;
@@ -257,6 +301,11 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.#streaming = null;
     clearTimeout(this.#paintTimer);
     this.#paintTimer = null;
+    for (const turn of this.#turns) {
+      if (!turn.pending) continue;
+      turn.pending = false;
+      turn.error ||= t("errors.cut");
+    }
   }
 
   /** The counter, its warning and the Send button follow the typing without a redraw. */
@@ -270,6 +319,14 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     }
     const send = el.querySelector("[data-action=send]");
     if (send) send.disabled = !this.#canSend();
+  }
+
+  /** The count in the bar, in place (no redraw under the player's typing); drawn once it first exists. */
+  async #showCount() {
+    const el = this.element?.querySelector(".crystalball-count");
+    const line = this.#countLine();
+    if (el && line) el.textContent = line;
+    else if (line && this.rendered) await this.render();
   }
 
   #transcript() {
@@ -299,10 +356,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
    * to Foundry or no open world), then the open sitting and the count.
    */
   async reload() {
-    const gen = ++this.#gen;
-    this.#abort?.abort();
-    this.#abort = null;
-    this.#busy = false;
+    this.#abandon();
+    const gen = this.#gen;
     this.#phase = "loading";
     if (this.rendered) await this.render();
     const health = await call("healthz");
@@ -317,21 +372,30 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.#turns = turns.filter(turn => turn?.role === "user" || turn?.role === "ball").map(turn => ({ role: turn.role, text: String(turn.text ?? "") }));
     this.#usage = usage.ok ? usage.body : null;
     this.#phase = "ready";
+    this.#toBottom = true;
     if (this.rendered) await this.render();
   }
 
-  /** Close the open sitting (the Seer keeps it) and start an empty one. */
-  async newSitting() {
-    const gen = ++this.#gen;
-    this.#abort?.abort();
-    this.#abort = null;
-    this.#busy = false;
+  /** Close the open sitting (the Seer keeps it) and start an empty one; once, however often clicked. */
+  newSitting() {
+    this.#renewing ??= this.#renew().finally(() => {
+      this.#renewing = null;
+    });
+    return this.#renewing;
+  }
+
+  async #renew() {
+    this.element?.querySelector("[data-action=newSitting]")?.setAttribute("disabled", "");
+    this.#abandon();
+    const gen = this.#gen;
     const sitting = await postNewSitting();
     if (gen !== this.#gen) return sitting;
     if (sitting) this.#turns = [];
-    const usage = await call("usage/me");
-    if (gen === this.#gen && usage.ok) this.#usage = usage.body;
     if (this.rendered) await this.render();
+    const usage = await call("usage/me");
+    if (gen !== this.#gen || !usage.ok) return sitting;
+    this.#usage = usage.body;
+    await this.#showCount();
     return sitting;
   }
 
@@ -347,9 +411,11 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const abort = new AbortController();
     this.#abort = abort;
     const timer = setTimeout(() => abort.abort(), CHAT_TIMEOUT_MS);
+    this.#toBottom = true;
     await this.render();
 
-    // A refusal before any answer gives the words back, so nothing typed is lost.
+    // A failure before any answer (a refusal, an error event, a cut) gives the words back, so
+    // nothing typed is lost.
     let giveBack = false;
     try {
       const url = endpoint("chat");
@@ -361,8 +427,9 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
         ball.error = failureLine(res?.status ?? 0, body);
         giveBack = true;
       } else {
-        const finished = await this.#read(res.body, ball, gen);
-        if (!finished && !ball.error) ball.error = t("errors.cut");
+        const end = await this.#read(res.body, ball, gen);
+        if (end === "cut") ball.error = t("errors.cut");
+        if (end === "error" || end === "cut") giveBack = !ball.text;
       }
     } catch (err) {
       if (gen === this.#gen) {
@@ -377,19 +444,21 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // Closed, reloaded or a new sitting meanwhile: that one owns the window now.
     if (gen !== this.#gen) return;
 
+    // The answer's end shows at once; the count follows when the Seer gives it.
     ball.pending = false;
     this.#busy = false;
     this.#streaming = null;
     if (giveBack && !this.#draft) this.#draft = text;
-    const usage = await call("usage/me");
-    if (gen !== this.#gen) return;
-    if (usage.ok) this.#usage = usage.body;
     if (this.rendered) await this.render();
+    const usage = await call("usage/me");
+    if (gen !== this.#gen || !usage.ok) return;
+    this.#usage = usage.body;
+    await this.#showCount();
   }
 
   /**
-   * Read the stream into the ball's turn. True once the stream has said its last word (`done` or
-   * `error`), false when it ended without one.
+   * Read the stream into the ball's turn: "done" or "error" once the stream has said its last word,
+   * "cut" when it ended without one, "gone" when the window moved on meanwhile.
    */
   async #read(stream, ball, gen) {
     const reader = stream.getReader();
@@ -401,7 +470,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       const { value, done } = await reader.read();
       if (gen !== this.#gen) {
         stop();
-        return true;
+        return "gone";
       }
       const events = done ? [...parser.feed(decoder.decode()), ...parser.end()] : parser.feed(decoder.decode(value, { stream: true }));
       for (const { event, data } of events) {
@@ -413,14 +482,15 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
         } else if (event === "done") {
           if (typeof data?.text === "string") ball.text = data.text;
           stop();
-          return true;
+          return "done";
         } else if (event === "error") {
           ball.error = failureLine(0, data);
           stop();
-          return true;
+          return "error";
         }
+        // Any other event (a heartbeat) is not the window's business.
       }
-      if (done) return false;
+      if (done) return "cut";
     }
   }
 

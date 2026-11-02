@@ -9,7 +9,8 @@
 // window it opens centred, and dark when no Seer answers at the Service URL.
 //
 // With --walk: a temporary player (assigned the --asker member's character and Owner on it for
-// the run) opens the window against the Seer at --seer (the Service URL setting is pointed there
+// the run) opens the window against the Seer at --seer (default http://localhost:30001/crystalball,
+// the Seer's BASE_PATH included; the Service URL setting is pointed there
 // for the run), sends a question with Enter, waits for the ball's answer to finish, checks the
 // stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
 // sitting empties the transcript. The temp user, its ownership and the setting go in `finally`.
@@ -33,7 +34,7 @@ const arg = n => {
   return i >= 0 ? process.argv[i + 1] : null;
 };
 const walk = process.argv.includes("--walk");
-const seerUrl = (arg("seer") ?? "http://localhost:30001").replace(/\/+$/, "");
+const seerUrl = (arg("seer") ?? "http://localhost:30001/crystalball").replace(/\/+$/, "");
 const askerName = arg("asker") ?? "Kartor";
 
 let fails = 0;
@@ -282,10 +283,12 @@ try {
         };
         const base = game.settings.get(id, "serviceUrl").replace(/\/+$/, "");
         const cookieSession = document.cookie.split("; ").some(c => c.startsWith("session="));
+        // As the window takes it: the socket's id first, the cookie only on an older build.
         const session =
-          Object.fromEntries(document.cookie.split("; ").map(c => c.split("="))).session ?? game.socket?.session?.sessionId ?? null;
+          game.socket?.session?.sessionId ??
+          decodeURIComponent(Object.fromEntries(document.cookie.split("; ").map(c => c.split("="))).session ?? "");
         const usageNow = () =>
-          fetch(`${base}/usage/me`, { headers: { "X-Foundry-Session": decodeURIComponent(session ?? "") } })
+          fetch(`${base}/usage/me`, { headers: { "X-Foundry-Session": session } })
             .then(r => r.json())
             .catch(() => null);
 
@@ -335,7 +338,7 @@ try {
         // New sitting: the transcript empties and the first line shows again.
         win.element.querySelector('[data-action="newSitting"]')?.click();
         const emptied = await until(() => !win.element?.querySelector(".crystalball-turn") && win.element?.querySelector(".crystalball-intro"), 10_000);
-        const current = await fetch(`${base}/sittings/current`, { headers: { "X-Foundry-Session": decodeURIComponent(session ?? "") } })
+        const current = await fetch(`${base}/sittings/current`, { headers: { "X-Foundry-Session": session } })
           .then(r => r.json())
           .catch(() => null);
         await win.close();
@@ -366,13 +369,11 @@ try {
       },
       { id: MODULE_ID, question: QUESTION }
     );
-    // The id the window sends: the cookie as document.cookie shows it, else the one Foundry's socket
-    // was handed. Either must be the browser's own session cookie, the one the Seer probes with.
+    // The id the window sends: the one Foundry's socket was handed. It must be the browser's own
+    // session cookie, the one the Seer probes with.
     const jar = (await fp.page.context().cookies()).find(c => c.name === "session") ?? null;
-    console.log(
-      `  the session cookie is ${C.cookieSession ? "readable from document.cookie" : "NOT readable from document.cookie (the socket's id stands in)"}; httpOnly=${jar?.httpOnly}`
-    );
-    assert(!!jar && (C.cookieSession || decodeURIComponent(jar.value) === C.socketSession), "the id the window sends is the browser's session cookie");
+    console.log(`  the session cookie: httpOnly=${jar?.httpOnly}, ${C.cookieSession ? "readable" : "not readable"} from document.cookie`);
+    assert(!!jar && !!C.socketSession && decodeURIComponent(jar.value) === C.socketSession, "the id the window sends (the socket's) is the browser's session cookie");
     assert(C.settled && !C.darkLine, `the window settled, not dark ("${C.darkLine ?? ""}")`);
     assert(!!C.model && !["Gazing…", "Dark"].includes(C.model), `the status bar names a model ("${C.model}"; healthz: ${health.model})`);
     if (C.settled && !C.darkLine) {

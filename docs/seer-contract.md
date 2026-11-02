@@ -15,8 +15,8 @@ to this file; a change to it is made here first. The plan is `../../docs/plans/c
 The window talks to the Seer over HTTP at `serviceUrl` (a world setting). Every request carries
 `X-Foundry-Session: <the player's session id>`: the id Foundry handed the client's own socket at connect,
 `game.socket.session.sessionId` (Foundry 14 sets the `session` cookie HttpOnly, so `document.cookie` never shows
-it; the client reads the cookie first for older builds and falls back to the socket's copy; the two are the same
-value). No other authentication. No cookies are relied on.
+it); the client takes the socket's copy first and falls back to a `session` cookie only when the socket has none
+(older builds); the two are the same value. No other authentication. No cookies are relied on.
 
 - prod: `serviceUrl` is the same-origin path `/crystalball` (the tunnel routes it to the Seer; no CORS).
 - sandbox: `serviceUrl` is `http://localhost:30001/crystalball` (the Seer's origin plus its `BASE_PATH`, the same
@@ -68,7 +68,7 @@ Body `{ "message": "<text>" }`. The reply is a Server-Sent Events stream (`Conte
 | `meta` | `{ "sittingId", "model", "gazeTokens": n, "layers": { "instructions": n, "lore": n, "party": n, "own": n } }` | first; token counts are the Seer's estimate (or `count_tokens` when a key is present) |
 | `delta` | `{ "text": "<piece>" }` | zero or more; the answer in order |
 | `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n, "day": n } }` | last on success |
-| `error` | `{ "error": "<code as in the table above>", "message": "<short>" }` | last on failure after the stream opened |
+| `error` | `{ "error": "<code as in the table above>", "message": "<short>", "reason"?: "<as the 503 body's>", "scope"?: "<as the 429 body's>", "retryAfter"?: <seconds> }` | last on failure after the stream opened; `reason` rides with `dark`, `scope` and `retryAfter` with `limit`, so the window words it as it would the status |
 
 The client reads the stream with `fetch` and a `ReadableStream` reader (an `EventSource` cannot send the header).
 A sitting's turn is stored only when `done` is sent. The Seer aborts the model call if the client disconnects.

@@ -13,6 +13,8 @@ const STREAM =
   'event: delta\ndata: {"text":"clears."}\n\n' +
   'event: done\ndata: {"text":"The ball clears.","cost":0}\n\n';
 
+const BOM = String.fromCharCode(0xfeff);
+
 describe("the Seer's event stream", () => {
   it("yields each event, its data parsed", () => {
     expect(parseAll(STREAM)).toEqual([
@@ -78,24 +80,45 @@ describe("the Seer's event stream", () => {
     ]);
   });
 
-  it("turns data that is not JSON into the contract's error event", () => {
-    const [ev] = parseAll("event: delta\ndata: {not json\n\n");
-    expect(ev.event).toBe("error");
-    expect(ev.data.error).toBe("seer");
-    expect(typeof ev.data.message).toBe("string");
+  it("turns a contract event's data that is not JSON into the contract's error event", () => {
+    for (const name of ["meta", "delta", "done", "error"]) {
+      const [ev] = parseAll(`event: ${name}\ndata: {not json\n\n`);
+      expect(ev.event).toBe("error");
+      expect(ev.data.error).toBe("seer");
+      expect(typeof ev.data.message).toBe("string");
+    }
   });
 
-  it("hands over an event the stream ended without its blank line", () => {
-    expect(parseAll('event: done\ndata: {"text":"end"}')).toEqual([
+  it("passes any other event through untouched, so a heartbeat never ends an answer", () => {
+    expect(
+      parseAll('event: ping\ndata: keep-alive\n\nevent: delta\ndata: {"text":"on"}\n\n')
+    ).toEqual([
+      { event: "ping", data: "keep-alive" },
+      { event: "delta", data: { text: "on" } }
+    ]);
+    expect(parseAll("data: plain words\n\n")).toEqual([{ event: "message", data: "plain words" }]);
+    expect(parseAll('event: ping\ndata: {"n":1}\n\n')).toEqual([{ event: "ping", data: { n: 1 } }]);
+  });
+
+  it("discards an event the stream ended before its blank line", () => {
+    expect(parseAll('event: done\ndata: {"text":"end"}')).toEqual([]);
+    expect(parseAll('event: done\ndata: {"text":"end"}\n')).toEqual([]);
+    expect(parseAll('event: delta\ndata: {"text":"a"}\n\nevent: done\ndata: {"text":"en')).toEqual([
+      { event: "delta", data: { text: "a" } }
+    ]);
+  });
+
+  it("still dispatches an event closed by a lone CR at the stream's very end", () => {
+    expect(parseAll('event: done\rdata: {"text":"end"}\r\r')).toEqual([
       { event: "done", data: { text: "end" } }
     ]);
-    expect(parseAll('event: done\ndata: {"text":"en').map(e => e.event)).toEqual(["error"]);
   });
 
-  it("drops a byte-order mark at the stream's start", () => {
-    expect(parseAll('﻿event: delta\ndata: {"text":"b"}\n\n')).toEqual([
+  it("drops a byte-order mark at the stream's start, and only there", () => {
+    expect(parseAll(`${BOM}event: delta\ndata: {"text":"b"}\n\n`)).toEqual([
       { event: "delta", data: { text: "b" } }
     ]);
+    expect(parseAll("event: delta\n", `${BOM}data: {"text":"c"}\n\n`)).toEqual([]);
   });
 
   it("keeps text with newlines and unicode inside the JSON", () => {

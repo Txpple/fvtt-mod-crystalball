@@ -24,17 +24,19 @@ export const escapeHtml = text => text.replace(/[&<>"']/g, c => ESCAPES[/** @typ
 const MARK = "\u0000";
 
 /**
- * Emphasis over escaped text. Each pattern wraps a span that holds no delimiter of its own kind,
- * so every tag it writes closes inside the span: the output stays balanced whatever the input.
- * Italic runs again after bold so `*a **b** c*` nests.
+ * Emphasis over escaped text, the `*` forms first. A `*` pattern wraps a span holding no `*`, and
+ * every earlier tag was written with its delimiters outside it, so a span holds whole elements or
+ * none. The `_` forms come last and refuse a span holding any tag, so they never cross a `*` one
+ * (`**a _b** c_` stays partly literal). Together: every tag written closes in order. Italic runs
+ * again after bold so `*a **b** c*` nests.
  */
 const EMPHASIS = [
   [/\*\*\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*\*\*/g, "<strong><em>$1</em></strong>"],
   [/(?<!\*)\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*(?!\*)/g, "<em>$1</em>"],
   [/\*\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*\*/g, "<strong>$1</strong>"],
   [/(?<!\*)\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*(?!\*)/g, "<em>$1</em>"],
-  [/(?<![\w_])__(?=[^\s_])([^_]+?)(?<=[^\s_])__(?![\w_])/g, "<strong>$1</strong>"],
-  [/(?<![\w_])_(?=[^\s_])([^_]+?)(?<=[^\s_])_(?![\w_])/g, "<em>$1</em>"]
+  [/(?<![\w_])__(?=[^\s_<])([^_<]+?)(?<=[^\s_])__(?![\w_])/g, "<strong>$1</strong>"],
+  [/(?<![\w_])_(?=[^\s_<])([^_<]+?)(?<=[^\s_])_(?![\w_])/g, "<em>$1</em>"]
 ];
 
 /**

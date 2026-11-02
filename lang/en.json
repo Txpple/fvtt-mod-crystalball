@@ -7,7 +7,7 @@
       },
       "serviceUrl": {
         "name": "Service URL",
-        "hint": "Where the window reaches the Seer: a path on this server (the default, /crystalball, when the server routes it to the Seer) or a full URL (on a local test table, http://localhost:30001)."
+        "hint": "Where the window reaches the Seer: a path on this server (the default, /crystalball, when the server routes it to the Seer) or a full URL (on a local test table, http://localhost:30001/crystalball)."
       },
       "tableNotes": {
         "name": "Table notes",
