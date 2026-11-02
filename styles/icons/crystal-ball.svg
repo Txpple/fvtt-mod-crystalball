@@ -4,11 +4,11 @@
     <radialGradient id="glass" cx="0.38" cy="0.34" r="0.7">
       <stop offset="0" stop-color="#cfe2ff"/>
       <stop offset="0.35" stop-color="#5b7fc4"/>
-      <stop offset="0.75" stop-color="#1d2a4a"/>
-      <stop offset="1" stop-color="#121a30"/>
+      <stop offset="0.75" stop-color="#34528c"/>
+      <stop offset="1" stop-color="#253b68"/>
     </radialGradient>
     <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0.6" stop-color="#c9a24a" stop-opacity="0.45"/>
+      <stop offset="0.6" stop-color="#e3c27a" stop-opacity="0.6"/>
       <stop offset="1" stop-color="#c9a24a" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">

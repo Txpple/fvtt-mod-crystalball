@@ -7,7 +7,7 @@ Board record. Nothing the DM keeps reaches it. The answers come from **the Seer*
 beside the Foundry server, holds the API key, and is logged into the world as a user of its own; no client ever
 holds a key or talks to the model.
 
-**0.1.0**, unreleased. The plan is `docs/plans/crystalball.md` in the suite repo; the contract between the window
+**1.0.0.** The plan is `docs/plans/crystalball.md` in the suite repo; the contract between the window
 and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own guide is
 [`seer/README.md`](seer/README.md).
 
