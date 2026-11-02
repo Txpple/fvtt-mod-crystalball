@@ -38,7 +38,7 @@ prod (17/17 served files byte-identical), the box's Seer at `v1.0.1` by the guid
 mirror reset it. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
-**The rulebooks, built on `main`, uncommitted and unreleased**: the ball looks up the Player's Handbook, Arcana
+**The rulebooks, committed on `main`, unreleased**: the ball looks up the Player's Handbook, Arcana
 Unleashed and Heroes of Faerûn through two tools (`rulebooks.js`, the contract's *The rulebooks*), instructions
 version 3; `npm run verify` green; exercised against copies of the three books' packs (and dnd5e's `content24`,
 which the Handbook's glossary embeds) read off disk, never through the sandbox, which was busy. Not
