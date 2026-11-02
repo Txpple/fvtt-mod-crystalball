@@ -52,8 +52,9 @@ about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region 
 definitions add about 350 tokens to the cached prefix. **On `main`, unreleased**: on the user's word ("for arcana
 unleashed, i want chapter 5, chapter 6, appendix, and bestiary excluded"), Arcana Unleashed's Chapter 5 (magic
 items, and its magic-items pack dropped from the defaults), Chapter 6 (creatures) and Appendix (art and the
-adventure) are left out by default, each by a line scoped to that book (`dnd-arcana-unleashed: Chapter 5`),
-because the Handbook has a Chapter 5 and 6 of its own; its bestiary was never read (actor packs are refused).
+adventure) are left out by default, then Chapter 3 (creating magical worlds; "remove Chapter 3: Creating Magical
+Worlds too"), each by a line scoped to that book (`dnd-arcana-unleashed: Chapter 5`), because the Handbook has
+a Chapter 3, 5 and 6 of its own; its bestiary was never read (actor packs are refused).
 Checked against the copied packs.
 
 ## The rules this module keeps

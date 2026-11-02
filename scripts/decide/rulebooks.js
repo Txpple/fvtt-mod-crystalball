@@ -29,12 +29,15 @@ export const DEFAULT_RULEBOOKS = [
 ].join("\n");
 
 /**
- * What the ball never reads in those books: the Handbook's stat blocks; Arcana Unleashed's magic
- * items (Chapter 5), creatures (Chapter 6) and adventure (the Appendix), each scoped to that book
- * because the Handbook has a Chapter 5 and 6 of its own; the credits and change logs.
+ * What the ball never reads in those books: the Handbook's stat blocks; Arcana Unleashed's
+ * worldbuilding (Chapter 3), magic items (Chapter 5), creatures (Chapter 6) and adventure (the
+ * Appendix), each scoped to that book because the Handbook has a Chapter 3, 5 and 6 of its own; the
+ * credits and change logs.
  */
 export const DEFAULT_LEAVE_OUT = [
   "Appendix B: Creature Stat Blocks",
+  "dnd-arcana-unleashed: Chapter 3",
+  "dnd-arcana-unleashed: Chapter 3: Creating Magical Worlds",
   "dnd-arcana-unleashed: Chapter 5",
   "dnd-arcana-unleashed: Chapter 5: Magic Items",
   "dnd-arcana-unleashed: Chapter 6",

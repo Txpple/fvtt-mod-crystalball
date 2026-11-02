@@ -33,8 +33,8 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
   has them). It searches and reads them only when a question needs it, says which book an answer comes from, and
   the window shows *the ball leafs through the rulebooks* while it looks. Only journal and item packs are read,
   never a bestiary: no monster and no stat block reaches it, and *Left out of the rulebooks* removes anything else
-  by folder, entry or page name, in every book or in one (by default Arcana Unleashed's magic items, creatures and
-  adventure, Chapters 5 and 6 and the Appendix). Each player reads only the packs
+  by folder, entry or page name, in every book or in one (by default Arcana Unleashed's worldbuilding, magic items,
+  creatures and adventure: Chapters 3, 5 and 6 and the Appendix). Each player reads only the packs
   Foundry opens to them.
 - **Who is asking.** The window sends the player's own Foundry session with every request, and the Seer asks
   Foundry whose it is. A stranger on the internet has no session; a player cannot pretend to be another.
@@ -74,7 +74,7 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |
 | The GM's gaze | a player's | What a GM's sitting knows: what every player sees plus the GM's own pages, or everything in the world. |
 | Rulebooks | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn packs | The compendium packs the ball may look rules up in, one pack id a line. Journal and item packs only; empty, it looks nothing up. |
-| Left out of the rulebooks | the Handbook's creature stat blocks; Arcana Unleashed's Chapter 5 (magic items), Chapter 6 (creatures) and Appendix (its adventure); credits, change logs | Folders, journal entries and pages it never reads in those packs, one name a line; `<book id>: <name>` leaves a name out of that book alone (`dnd-arcana-unleashed: Chapter 5`). |
+| Left out of the rulebooks | the Handbook's creature stat blocks; Arcana Unleashed's Chapter 3 (creating magical worlds), Chapter 5 (magic items), Chapter 6 (creatures) and Appendix (its adventure); credits, change logs | Folders, journal entries and pages it never reads in those packs, one name a line; `<book id>: <name>` leaves a name out of that book alone (`dnd-arcana-unleashed: Chapter 5`). |
 
 ## Repository layout
 

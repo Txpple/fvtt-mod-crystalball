@@ -90,7 +90,7 @@ Scope `world`, namespace `fvtt-mod-crystalball`, registered by the module, read 
 | `gmGaze` | `"player"` \| `"all"` | `"player"` | a GM's gaze: what every player sees plus the GM's own pages, or everything |
 | `modelLabel` | string | (unset) | reserved; the window shows what `healthz` reports |
 | `rulebooks` | string | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn's player packs (`scripts/decide/rulebooks.js`) | the compendium packs the ball may look things up in, one pack id a line (commas too); empty: no lookups |
-| `rulebookLeaveOut` | string | the Handbook's stat-block appendix; Arcana Unleashed's Chapters 5 and 6 and Appendix (magic items, creatures, adventure); credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents; a line led by a package or pack id the world has and a colon (`dnd-arcana-unleashed: Chapter 5`) applies to that book alone |
+| `rulebookLeaveOut` | string | the Handbook's stat-block appendix; Arcana Unleashed's Chapters 3, 5 and 6 and Appendix (worldbuilding, magic items, creatures, adventure); credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents; a line led by a package or pack id the world has and a colon (`dnd-arcana-unleashed: Chapter 5`) applies to that book alone |
 
 ## The gaze
 
