@@ -36,12 +36,13 @@ All responses are JSON (`application/json`) except `POST chat`, which is `text/e
 | 429 | `{ "error": "limit", "scope": "hour" \| "day" \| "table-day" \| "table-month", "retryAfter": <seconds> }` | a cap is hit |
 | 503 | `{ "error": "dark", "reason": "foundry-disconnected" \| "world-closed" \| "model" }` | the ball's user is not connected, the world is not open, or the model call failed |
 | 500 | `{ "error": "seer", "message": "<short>" }` | anything else; nothing sensitive in `message` |
+| 400 / 404 / 405 | `{ "error": "seer" }` | a malformed request, an unknown path, a wrong method |
 
 ### `GET healthz`
 
 `{ "version": "<the Seer's version, = module.json's>", "foundry": { "connected": bool, "worldOpen": bool,
-"world": "<id or null>", "ballUser": "<name or null>" }, "model": "<model id or 'stub'>", "uptimeSeconds": n }`.
-Always 200. No secrets, no paths.
+"world": "<id or null>", "ballUser": "<name or null>" }, "model": "<model id or 'stub'>", "uptimeSeconds": n,
+"timeZone": "<the zone the limits' calendar follows>" }`. Always 200. No secrets, no paths.
 
 ### `GET sittings/current`
 
@@ -98,11 +99,13 @@ Built per user from the live `world` payload, in this order, deterministically (
    `≥ 2` or `-1` inheriting), text pages as Markdown (`@UUID[...]{Name}` → `Name`, `@UUID[...]` without a label →
    the document's name when it can be resolved from the payload, else dropped), image/video/pdf pages as a title
    line and caption. Grouped by entry, entries in folder order.
-3. **party**: the Group actor whose `system.members` includes a character the user owns (the first by name when
-   several); members (name, species, classes/levels, HP current/max, AC), the stash (currency, items with
-   quantity), and the Clue Board record when `fvtt-mod-clueboard` flags are on the group: each entry (keyed by
-   the world Clue item's id) joined to that item (`system.kind`, `system.text`, `system.foundAt`) with its readers
-   (actor names) and the threads (name, question, status, stand) with their pinned clues in order.
+3. **party**: the Group actor whose `system.members` includes a character the user owns and which the user can
+   observe (the first by name when several); members (name, species, classes/levels, HP current/max, AC), the
+   stash (currency, items with quantity), and the Clue Board record when `fvtt-mod-clueboard` flags are on the
+   group: each entry (keyed by the world Clue item's id) joined to that item (`system.kind`, `system.text`,
+   `system.foundAt`; the record's own snapshot when the item is gone) with its readers (actor names) and the
+   threads (name, question, status, stand) with their pinned clues in order. World text in layers 2–4 has `<` and
+   `>` replaced by `‹` and `›` after conversion, so no page can close or forge a tagged section.
 4. **own**: journal pages only this user (not every player) can observe, then each actor of type `character` the
    user owns (ownership level 3, explicit) as a curated sheet (see `seer/src/sheet.js`): identity, classes,
    abilities/saves/skills, HP/AC/speed/senses, proficiencies and languages, currency, spell slots and spells with
@@ -150,7 +153,10 @@ rolling hour and calendar day (local time of the box); the table's day and month
 `DATA_DIR` (default `seer/data`), created `0700` where the platform allows: `sittings/<userId>/current.json`,
 `sittings/<userId>/<startedAt>.json` (closed; older than `sittingRetentionDays: 90` deleted at start and daily),
 `usage.jsonl` (one line per call: `{ at, userId, userName, model, usage, cost, gazeTokens, layers: { <hash per
-layer> }, latencyMs, stub }`). Writes are write-then-rename. The identity cache is memory only.
+layer> }, latencyMs, stub, outcome: "done" | "aborted" | "failed", estimated?: true }`; a call is counted against
+the caps and the ledger the moment the model is asked, whatever its end, from the stream's last usage or, failing
+that, the gaze's estimate marked `estimated`). Writes are write-then-rename; the ledger is append plus fsync. The
+probe is asked on every request; only a refusal is remembered, for 30 seconds, in memory.
 
 ## Environment (`seer/.env`, loaded by the Seer; `seer/.env.example` documents it)
 
@@ -165,8 +171,8 @@ layer> }, latencyMs, stub }`). Writes are write-then-rename. The identity cache 
 | `BIND` | `127.0.0.1` | the Seer's bind address |
 | `BASE_PATH` | `/crystalball` | the path prefix every endpoint sits under (`/crystalball/healthz`); `/` for none |
 | `CORS_ORIGIN` | (none → CORS off) | the one origin allowed (the sandbox: `http://localhost:30000`) |
-| `DATA_DIR` | `seer/data` | storage |
-| `CONFIG` | `seer/config.json` | the config file (committed defaults; a copy beside `.env` overrides) |
+| `DATA_DIR` | systemd's `STATE_DIRECTORY` when set, else `seer/data` under the repo root | storage; on a box an absolute path or a `StateDirectory=` line in the unit |
+| `CONFIG` | `seer/config.json` | the config file (the committed defaults); another file's path, absolute on a box, relative to the repo root otherwise |
 | `LOG_LEVEL` | `info` | `debug` prints the gaze's layer sizes and cache hits per call |
 
 ## Foundry contracts the Seer depends on (Foundry 14.369, read from `resources/app/dist`)

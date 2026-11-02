@@ -13,6 +13,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { estimateTokens } from "./gaze.js";
+import { EMPTY_TEXT, REFUSAL_TEXT } from "./instructions.js";
+
+export { EMPTY_TEXT, REFUSAL_TEXT };
 
 export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
@@ -94,6 +97,25 @@ export function costOf(usage, rawUsage, prices, ttl) {
   return dollars / 1e6;
 }
 
+/**
+ * A response's cost: each sampling hop at its own model's prices when the usage lists the hops
+ * (a turn a fallback model served lists the declined model's attempt and the fallback's), else
+ * the whole usage at the served model's.
+ */
+export function priceUsage(raw, served, config) {
+  const prices = config.prices ?? {};
+  const hops = Array.isArray(raw?.iterations)
+    ? raw.iterations.filter(h => h && typeof h === "object")
+    : [];
+  if (hops.length) {
+    return hops.reduce(
+      (sum, h) => sum + costOf(usageOf(h), h, prices[h.model] ?? prices[served], config.cacheTtl),
+      0
+    );
+  }
+  return costOf(usageOf(raw), raw, prices[served], config.cacheTtl);
+}
+
 /** The text blocks of a final message, joined. */
 const textOf = message =>
   (message?.content ?? [])
@@ -101,8 +123,15 @@ const textOf = message =>
     .map(b => b.text)
     .join("");
 
-/** The words a declined request answers with when nothing at all was said before the refusal. */
-export const REFUSAL_TEXT = "The ball stays clouded on that: the model declined to answer.";
+const charsOf = (layers, messages) =>
+  layers.reduce((s, l) => s + l.text.length, 0) +
+  messages.reduce((s, m) => s + String(m.content).length, 0);
+
+const isAbort = (err, signal) =>
+  Boolean(signal?.aborted) ||
+  err instanceof Anthropic.APIUserAbortError ||
+  err?.name === "AbortError" ||
+  err?.name === "TimeoutError";
 
 /**
  * The model, real or stub.
@@ -114,6 +143,52 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
   const anthropic = isStub ? null : (client ?? new Anthropic({ apiKey, maxRetries: 2 }));
   let fallbackUsable = config.refusalFallback !== false;
   const counts = new Map();
+  const priced = model => (model && config.prices?.[model] ? model : config.model);
+
+  /**
+   * What a call that did not finish spent, for the ledger and the caps: the stream's last usage
+   * snapshot when one arrived; else, when the request reached the model (words came back, or it
+   * was aborted or timed out mid-flight), the gaze and messages estimated at the input price plus
+   * the words that arrived; else (an HTTP refusal before any stream) nothing, since none is billed.
+   */
+  function partialSpend(err, layers, messages, signal) {
+    const outChars = err?.outChars ?? 0;
+    const snap = err?.snapshot?.usage;
+    const served = priced(err?.snapshot?.model);
+    if (
+      snap &&
+      (snap.input_tokens || snap.cache_read_input_tokens || snap.cache_creation_input_tokens)
+    ) {
+      const usage = usageOf(snap);
+      usage.output = Math.max(usage.output, Math.ceil(outChars / 4));
+      return {
+        usage,
+        cost: priceUsage({ ...snap, output_tokens: usage.output }, served, config),
+        model: served,
+        estimated: false
+      };
+    }
+    if (outChars > 0 || isAbort(err, signal)) {
+      const usage = {
+        input: Math.ceil(charsOf(layers, messages) / 4),
+        cacheWrite: 0,
+        cacheRead: 0,
+        output: Math.ceil(outChars / 4)
+      };
+      return {
+        usage,
+        cost: costOf(usage, null, config.prices?.[served], config.cacheTtl),
+        model: served,
+        estimated: true
+      };
+    }
+    return {
+      usage: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
+      cost: 0,
+      model: served,
+      estimated: false
+    };
+  }
 
   return {
     /** The model id the Seer reports: the configured one, or "stub". */
@@ -127,7 +202,8 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
 
     /**
      * The gaze's token count: `count_tokens` when a key is present (memoised by the layers'
-     * hashes, so a rebuild that changed nothing costs no call), else the estimate.
+     * hashes, so a rebuild that changed nothing costs no call), else the estimate. Ten seconds at
+     * most: a slow count falls back to the estimate and never holds up or fails the chat.
      */
     async countGaze(layers) {
       const estimate = layers.reduce((s, l) => s + l.estTokens, 0);
@@ -135,11 +211,14 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
       const key = layers.map(l => l.hash).join(":");
       if (counts.has(key)) return counts.get(key);
       try {
-        const res = await anthropic.messages.countTokens({
-          model: config.model,
-          system: systemBlocks(layers, config.cacheTtl),
-          messages: [{ role: "user", content: "." }]
-        });
+        const res = await anthropic.messages.countTokens(
+          {
+            model: config.model,
+            system: systemBlocks(layers, config.cacheTtl),
+            messages: [{ role: "user", content: "." }]
+          },
+          { signal: AbortSignal.timeout(10000), maxRetries: 0 }
+        );
         const n = res?.input_tokens ?? estimate;
         if (counts.size > 64) counts.clear();
         counts.set(key, n);
@@ -151,7 +230,8 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
     },
 
     /**
-     * Answer one message.
+     * Answer one message. A failure carries `spend` (`{ usage, cost, model, estimated }`): what
+     * the unfinished call cost, so the caller can count it.
      * @param {{ layers: Array<{ text: string }>, messages: Array<{ role: string, content: string }>,
      *   meta: object, message: string, onDelta: (text: string) => void, signal?: AbortSignal }} call
      * @returns {Promise<{ text: string, usage: object, cost: number, model: string, stopReason: string }>}
@@ -159,22 +239,26 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
     async answer({ layers, messages, meta, message, onDelta, signal }) {
       if (isStub) {
         const text = stubAnswer(meta, message);
+        const input = Math.ceil(charsOf(layers, messages) / 4);
+        let sent = 0;
         // Streamed in word-sized pieces, so the window's delta path runs as it does for a model.
         for (const piece of text.match(/\S+\s*|\s+/g) ?? []) {
-          if (signal?.aborted) throw signal.reason ?? new Error("aborted");
+          if (signal?.aborted) {
+            const err = signal.reason instanceof Error ? signal.reason : new Error("aborted");
+            err.spend = {
+              usage: { input, cacheWrite: 0, cacheRead: 0, output: Math.ceil(sent / 4) },
+              cost: 0,
+              model: "stub",
+              estimated: true
+            };
+            throw err;
+          }
+          sent += piece.length;
           onDelta(piece);
         }
-        const chars =
-          layers.reduce((s, l) => s + l.text.length, 0) +
-          messages.reduce((s, m) => s + String(m.content).length, 0);
         return {
           text,
-          usage: {
-            input: Math.ceil(chars / 4),
-            cacheWrite: 0,
-            cacheRead: 0,
-            output: estimateTokens(text)
-          },
+          usage: { input, cacheWrite: 0, cacheRead: 0, output: estimateTokens(text) },
           cost: 0,
           model: "stub",
           stopReason: "end_turn"
@@ -185,7 +269,7 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
       const abort = signal ? AbortSignal.any([signal, timeout]) : timeout;
       const params = requestParams(config, layers, messages);
       const run = async useFallback => {
-        let said = false;
+        let outChars = 0;
         const stream = useFallback
           ? anthropic.beta.messages.stream(
               { ...params, betas: [FALLBACK_BETA], fallbacks: "default" },
@@ -193,42 +277,51 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
             )
           : anthropic.messages.stream(params, { signal: abort });
         stream.on("text", delta => {
-          said = true;
+          outChars += delta.length;
           onDelta(delta);
         });
         try {
           return await stream.finalMessage();
         } catch (err) {
-          err.said = said;
-          throw err;
+          const e = err instanceof Error ? err : new Error(String(err));
+          e.outChars = outChars;
+          e.snapshot = stream.currentMessage ?? null;
+          throw e;
         }
       };
 
       let final;
       try {
-        final = await run(fallbackUsable);
+        try {
+          final = await run(fallbackUsable);
+        } catch (err) {
+          // A 400 that names the fallback before a word was streamed: the beta field is refused
+          // here (another platform, a retired beta). Drop to the plain client for good.
+          const refusedField =
+            fallbackUsable &&
+            !err.outChars &&
+            err?.status === 400 &&
+            /fallback|beta/i.test(err?.message ?? "");
+          if (!refusedField) throw err;
+          log.warn("the server-side refusal fallback was refused; calling without it from now on", {
+            error: err.message
+          });
+          fallbackUsable = false;
+          final = await run(false);
+        }
       } catch (err) {
-        // A 400 that names the fallback before a word was streamed: the beta field is refused
-        // here (another platform, a retired beta). Drop to the plain client for good.
-        const refusedField =
-          fallbackUsable &&
-          !err.said &&
-          err?.status === 400 &&
-          /fallback|beta/i.test(err?.message ?? "");
-        if (!refusedField) throw err;
-        log.warn("the server-side refusal fallback was refused; calling without it from now on", {
-          error: err.message
-        });
-        fallbackUsable = false;
-        final = await run(false);
+        err.spend = partialSpend(err, layers, messages, abort);
+        throw err;
       }
 
       const usage = usageOf(final.usage);
-      const served = final.model && config.prices?.[final.model] ? final.model : config.model;
-      const cost = costOf(usage, final.usage, config.prices?.[served], config.cacheTtl);
+      const served = priced(final.model);
+      const cost = priceUsage(final.usage, served, config);
       let text = textOf(final);
-      if (!text.trim() && final.stop_reason === "refusal") {
-        text = REFUSAL_TEXT;
+      if (!text.trim()) {
+        // A turn with no words (a refusal, output spent on thinking, a paused turn) is stored
+        // as one of the ball's sentences, never empty.
+        text = final.stop_reason === "refusal" ? REFUSAL_TEXT : EMPTY_TEXT;
         onDelta(text);
       }
       return { text, usage, cost, model: served, stopReason: final.stop_reason ?? "" };

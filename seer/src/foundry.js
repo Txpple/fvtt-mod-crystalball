@@ -16,7 +16,7 @@
  * - **The probe**: the same handshake with a player's session id, read `session`, disconnect.
  *
  * The Seer emits nothing else and writes nothing to Foundry. A session id is never logged: the
- * probe's memo is keyed by its sha256.
+ * probe's short memo of refusals is keyed by its sha256.
  */
 
 import { createHash } from "node:crypto";
@@ -157,14 +157,19 @@ function nextEvent(socket, event, ms) {
 /** An emit with an acknowledgement, or a rejection on a timeout. */
 function ask(socket, event, ms) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`no answer to "${event}" within ${ms} ms`)),
-      ms
-    );
-    socket.emit(event, value => {
+    // A socket that drops (Foundry restarting) never answers: the ask fails at once, not at the
+    // timeout, so a request waiting on it is told the ball is dark.
+    const onDrop = reason =>
+      done(new Error(`the socket dropped before "${event}" was answered: ${reason}`));
+    const timer = setTimeout(() => done(new Error(`no answer to "${event}" within ${ms} ms`)), ms);
+    function done(err, value) {
       clearTimeout(timer);
-      resolve(value);
-    });
+      socket.off?.("disconnect", onDrop);
+      if (err) reject(err);
+      else resolve(value);
+    }
+    socket.once("disconnect", onDrop);
+    socket.emit(event, value => done(null, value));
   });
 }
 
@@ -193,8 +198,9 @@ function limiter(size) {
 /**
  * The link.
  * @param {{ url: string, user: string, password: string, log: object, io?: Function,
- *   request?: Function, now?: () => number, worldTtlMs?: number, probeTtlMs?: number,
- *   negativeTtlMs?: number, minBackoffMs?: number, maxBackoffMs?: number }} options
+ *   request?: Function, now?: () => number, worldTtlMs?: number, negativeTtlMs?: number,
+ *   minBackoffMs?: number, maxBackoffMs?: number }} options  `now` is a monotonic clock in ms,
+ *   so a wall-clock change never stretches or cuts a cache
  */
 export function createLink({
   url,
@@ -203,9 +209,8 @@ export function createLink({
   log,
   io = socketIo,
   request = httpRequest,
-  now = Date.now,
+  now = () => performance.now(),
   worldTtlMs = 60000,
-  probeTtlMs = 600000,
   negativeTtlMs = 30000,
   minBackoffMs = 1000,
   maxBackoffMs = 60000
@@ -413,21 +418,26 @@ export function createLink({
 
     /**
      * Whose session this is: `{ userId }`, or null when Foundry does not know it or it has not
-     * joined the world. Memoised ten minutes under the id's hash (a refusal thirty seconds, so
-     * a player who joins a moment later is not shut out). Throws when Foundry cannot be reached.
+     * joined the world. Asked of Foundry on every request: Foundry keeps a browser's session id
+     * across a logout and binds it to whoever logs in next, so a remembered answer could hand one
+     * player another's gaze, sitting and allowance. Only a refusal is remembered, thirty seconds
+     * under the id's hash (a stranger's flood costs few sockets; a player who joins a moment later
+     * waits little). Throws when Foundry cannot be reached.
      */
     async probe(sessionId) {
       if (!SESSION_ID.test(String(sessionId ?? ""))) return null;
       const key = sessionHash(sessionId);
-      const hit = memo.get(key);
-      if (hit && now() < hit.until) return hit.result;
+      const refusedUntil = memo.get(key);
+      if (refusedUntil !== undefined && now() < refusedUntil) return null;
+      memo.delete(key);
       if (probing.has(key)) return probing.get(key);
       const p = probeSlot(() => probeOnce(sessionId))
         .then(result => {
-          memo.delete(key);
-          memo.set(key, { result, until: now() + (result ? probeTtlMs : negativeTtlMs) });
-          // A stranger sending random ids cannot grow the memo without bound.
-          while (memo.size > 1000) memo.delete(memo.keys().next().value);
+          if (!result) {
+            memo.set(key, now() + negativeTtlMs);
+            // A stranger sending random ids cannot grow the memo without bound.
+            while (memo.size > 1000) memo.delete(memo.keys().next().value);
+          }
           return result;
         })
         .finally(() => probing.delete(key));

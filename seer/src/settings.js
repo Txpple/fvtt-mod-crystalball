@@ -32,11 +32,25 @@ function parse(value) {
  */
 export function moduleSettings(world) {
   const raw = { ...SETTING_DEFAULTS };
+  const roles = new Map((world?.users ?? []).map(u => [u?._id, u?.role ?? 0]));
+  // Foundry 14.369 lets a player update their own user-scoped row, `user: null` included, which
+  // would turn it into a world row of the player's writing. The server stamps who last modified
+  // a row, so a world row counts only when that is nobody recorded or a GM (role 3 or above).
+  const trusted = s => {
+    const by = s?._stats?.lastModifiedBy;
+    return by === undefined || by === null || (roles.get(by) ?? 0) >= 3;
+  };
+  const seen = new Set();
   for (const s of world?.settings ?? []) {
     // A user-scoped setting carries its user; only the world's own rows are the DM's.
     if (s?.user || typeof s?.key !== "string" || !s.key.startsWith(`${MODULE_ID}.`)) continue;
+    if (!trusted(s)) continue;
     const name = s.key.slice(MODULE_ID.length + 1);
-    if (name in raw) raw[name] = parse(s.value);
+    // Should a key appear twice, the first trusted row decides.
+    if (name in raw && !seen.has(name)) {
+      seen.add(name);
+      raw[name] = parse(s.value);
+    }
   }
   return {
     enabled: raw.enabled !== false && raw.enabled !== "false",
@@ -56,6 +70,9 @@ export function moduleSettings(world) {
 export const moduleActive = world =>
   (world?.modules ?? []).some(m => m?.id === MODULE_ID && m.active === true);
 
-/** Whether the user may ask under *Who may ask*. */
+/**
+ * Whether the user may ask under *Who may ask*. A banned user (role 0, Foundry's NONE) never may,
+ * even on a session that is still live.
+ */
 export const mayAsk = (settings, user) =>
-  settings.askers !== "listed" || settings.askerIds.includes(user?._id);
+  (user?.role ?? 0) >= 1 && (settings.askers !== "listed" || settings.askerIds.includes(user?._id));

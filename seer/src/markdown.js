@@ -90,6 +90,28 @@ function rollWords(command, args) {
   return args.split("#")[0].trim();
 }
 
+/*
+ * The enrichers' patterns. Every inner part excludes both brackets (or both braces) and is
+ * capped in length, so text full of unclosed `[[` or `@UUID[` (a player's own biography is world
+ * text) is scanned in linear time instead of rescanning to the end of the page from every
+ * opening bracket.
+ */
+const INNER = "([^\\[\\]]{0,500})";
+const LABEL = "(?:\\{([^{}]{0,500})\\})?";
+const DOCUMENT_LINK = new RegExp(
+  `@(UUID|Actor|Item|JournalEntry|Scene|RollTable|Macro|Compendium)\\[${INNER}\\]${LABEL}`,
+  "g"
+);
+const DND_LINK = new RegExp(
+  `@(Check|Save|Skill|Tool|Damage|Attack|Lookup)\\[${INNER}\\]${LABEL}`,
+  "g"
+);
+const REFERENCE = new RegExp(`&(?:amp;)?Reference\\[${INNER}\\]${LABEL}`, "g");
+const EMBED = new RegExp(`@Embed\\[${INNER}\\]${LABEL}`, "g");
+const LOOKUP = new RegExp(`\\[\\[\\s{0,20}lookup\\b${INNER}\\]\\]${LABEL}`, "gi");
+const COMMAND = new RegExp(`\\[\\[\\/(\\w{1,32})${INNER}\\]\\]${LABEL}`, "g");
+const INLINE_ROLL = new RegExp(`\\[\\[${INNER}\\]\\]${LABEL}`, "g");
+
 /**
  * Foundry's enricher syntax as plain words, on the stored HTML before conversion.
  * @param {string} html
@@ -98,41 +120,34 @@ function rollWords(command, args) {
 export function enrichToText(html, nameOf = () => null) {
   let out = String(html ?? "");
   // @UUID[...]{Label} and the older @Actor[...]{Label}, @Compendium[...]{Label} and friends.
-  out = out.replace(
-    /@(UUID|Actor|Item|JournalEntry|Scene|RollTable|Macro|Compendium)\[([^\]]*)\](?:\{([^}]*)\})?/g,
-    (_m, kind, target, label) => {
-      if (label !== undefined) return label;
-      if (kind === "Compendium") return "";
-      const uuid = kind === "UUID" ? target.split("#")[0] : `${kind}.${target}`;
-      return nameOf(uuid) ?? "";
-    }
-  );
+  out = out.replace(DOCUMENT_LINK, (_m, kind, target, label) => {
+    if (label !== undefined) return label;
+    if (kind === "Compendium") return "";
+    const uuid = kind === "UUID" ? target.split("#")[0] : `${kind}.${target}`;
+    return nameOf(uuid) ?? "";
+  });
   // dnd5e's @Check[...]{Label}, @Save[...], @Damage[...]: the label, or the bracket's words.
-  out = out.replace(
-    /@(Check|Save|Skill|Tool|Damage|Attack|Lookup)\[([^\]]*)\](?:\{([^}]*)\})?/g,
-    (_m, _kind, inner, label) => (label !== undefined ? label : inner.replace(/[|]/g, " "))
+  out = out.replace(DND_LINK, (_m, _kind, inner, label) =>
+    label !== undefined ? label : inner.replace(/[|]/g, " ")
   );
   // &Reference[Charmed apply=false]{Label}: the label, or the reference's first word. Stored
   // HTML usually carries the ampersand encoded.
-  out = out.replace(/&(?:amp;)?Reference\[([^\]]*)\](?:\{([^}]*)\})?/g, (_m, inner, label) => {
+  out = out.replace(REFERENCE, (_m, inner, label) => {
     if (label !== undefined) return label;
     const name = inner.split(/\s+/).find(t => !t.includes("=")) ?? "";
     const plain = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name;
     return plain ? plain.charAt(0).toUpperCase() + plain.slice(1) : "";
   });
   // @Embed[...] places a picture or a table the reader cannot be given here.
-  out = out.replace(/@Embed\[[^\]]*\](?:\{[^}]*\})?/g, "");
+  out = out.replace(EMBED, "");
   // [[lookup @scale...]] reads a computed value the raw world does not hold: dropped.
-  out = out.replace(/\[\[\s*lookup\b[^\]]*\]\](?:\{([^}]*)\})?/gi, (_m, label) => label ?? "");
+  out = out.replace(LOOKUP, (_m, _inner, label) => label ?? "");
   // [[/command args]]{Label}: the label, or the command's words.
-  out = out.replace(/\[\[\/(\w+)\s*([^\]]*)\]\](?:\{([^}]*)\})?/g, (_m, cmd, args, label) =>
-    label !== undefined ? label : rollWords(cmd, args)
+  out = out.replace(COMMAND, (_m, cmd, args, label) =>
+    label !== undefined ? label : rollWords(cmd, args.trim())
   );
   // [[1d6 + 2]]{Label}: an inline roll, as its formula.
-  out = out.replace(
-    /\[\[([^\]]*)\]\](?:\{([^}]*)\})?/g,
-    (_m, formula, label) => label ?? formula.trim()
-  );
+  out = out.replace(INLINE_ROLL, (_m, formula, label) => label ?? formula.trim());
   return out;
 }
 
@@ -228,7 +243,3 @@ export function htmlToMarkdown(html, { nameOf, secrets = false, headingOffset = 
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
-
-/** A one-line plain text of stored HTML (names, short labels). */
-export const htmlToLine = (html, options) =>
-  htmlToMarkdown(html, options).replace(/\s+/g, " ").trim();

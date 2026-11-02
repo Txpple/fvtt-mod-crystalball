@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enrichToText, htmlToLine, htmlToMarkdown, uuidNamer } from "../src/markdown.js";
+import { enrichToText, htmlToMarkdown, uuidNamer } from "../src/markdown.js";
 import { world } from "./helpers.js";
 
 describe("@UUID links", () => {
@@ -122,7 +122,24 @@ describe("htmlToMarkdown", () => {
     );
   });
 
-  it("gives one line for short labels", () => {
-    expect(htmlToLine("<p>two</p><p>lines</p>")).toBe("two lines");
+  it("runs in linear time on unclosed brackets", () => {
+    for (const flood of [
+      "[[".repeat(50000),
+      "@UUID[".repeat(20000),
+      "&amp;Reference[".repeat(8000),
+      `${"[[/r 1d6 ".repeat(10000)}`,
+      `@UUID[x]{${"{".repeat(50000)}`
+    ]) {
+      const t0 = performance.now();
+      htmlToMarkdown(`<p>${flood}</p>`);
+      enrichToText(flood);
+      expect(performance.now() - t0).toBeLessThan(1000);
+    }
+  });
+
+  it("still reads an enricher beside the flood", () => {
+    expect(enrichToText(`${"[[".repeat(100)} [[/check dex]] @UUID[Actor.x]{the smith}`)).toContain(
+      "Dexterity check the smith"
+    );
   });
 });

@@ -1,14 +1,14 @@
 /**
  * The usage ledger, `usage.jsonl` under DATA_DIR: one JSON line per model call (when, who, the
- * model, the four token counts, the cost, the layer hashes, the latency, whether it was the stub).
+ * model, the four token counts, the cost, the layer hashes, the latency, whether it was the stub,
+ * and its outcome: done, aborted or failed, with `estimated` when the spend had to be worked out).
  * Counts and hashes, never words. It is append-only, so a line is appended and fsynced, never
  * written through a temporary file and a rename (a rename would race a concurrent append and lose
- * a line). The table's day and month are summed from it at start.
+ * a line). At start its lines seed the limits store, which does the counting and summing.
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { startOfDay, startOfMonth } from "./limits.js";
 
 /** Every readable line of a ledger file; a torn or foreign line is skipped. */
 export function readLedger(file) {
@@ -30,28 +30,6 @@ export function readLedger(file) {
     }
   }
   return lines;
-}
-
-/** The table's calendar day and month from ledger lines: messages and dollars. */
-export function sums(lines, now = new Date()) {
-  const day = startOfDay(now).getTime();
-  const month = startOfMonth(now).getTime();
-  const t = now.getTime();
-  const out = { day: { messages: 0, cost: 0 }, month: { messages: 0, cost: 0 } };
-  for (const l of lines) {
-    const at = Date.parse(l.at);
-    if (!Number.isFinite(at) || at > t) continue;
-    const cost = Number(l.cost) || 0;
-    if (at >= month) {
-      out.month.messages++;
-      out.month.cost += cost;
-    }
-    if (at >= day) {
-      out.day.messages++;
-      out.day.cost += cost;
-    }
-  }
-  return out;
 }
 
 /** The ledger on disk. */

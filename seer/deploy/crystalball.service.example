@@ -6,26 +6,42 @@ Description=Open Roll 5e: Crystal Ball (the Seer)
 # The Seer waits for Foundry by itself (it reconnects with backoff), so ordering is a courtesy.
 After=network-online.target
 Wants=network-online.target
+# Uncomment to stop a unit that keeps failing (a bad config, a wrong password) instead of
+# restarting it every five seconds for ever: here, five failed starts within five minutes.
+#StartLimitIntervalSec=300
+#StartLimitBurst=5
 
 [Service]
 Type=simple
 User=<service-user>
 Group=<service-group>
-# The clone of the fvtt-mod-crystalball repository, checked out at a release tag.
+# The clone of the fvtt-mod-crystalball repository, checked out at a release tag, readable by the
+# service user and writable only by the admin who updates it.
 WorkingDirectory=<path-to-the-clone>
-ExecStart=/usr/bin/node seer/src/main.js
-# The key, the ball's password and the rest of seer/.env.example; owned by the service user, mode 0600.
+# The absolute path of Node 24 or newer as the service user resolves it (`command -v node`);
+# a distribution's /usr/bin/node is often too old, and an nvm install lives elsewhere.
+ExecStart=<absolute-path-to-node> seer/src/main.js
+# The key, the ball's password and the rest of seer/.env.example; mode 0600, root's or the
+# service user's (systemd reads it before it drops privileges).
 EnvironmentFile=<path-to-the-env-file>
+# The zone the limits' calendar days and months follow. A server is usually on UTC, which resets
+# every player's day in the middle of a US evening; set the DM's zone and restart.
+#Environment=TZ=<the DM's zone, as America/Chicago>
 Restart=always
 RestartSec=5
 # SIGTERM lets the Seer close its socket and open streams cleanly.
 KillSignal=SIGTERM
 TimeoutStopSec=10
 
-# The Seer reads its clone and writes only its data directory.
+# The Seer's data (sittings, the usage ledger): /var/lib/crystalball, made and owned for the
+# service user by systemd and writable under ProtectSystem=strict; the Seer finds it through
+# STATE_DIRECTORY when DATA_DIR is unset.
+StateDirectory=crystalball
+StateDirectoryMode=0700
+
+# The Seer reads its clone and writes only its state directory.
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=<path-to-the-data-dir>
 NoNewPrivileges=true
 PrivateTmp=true
 UMask=0077

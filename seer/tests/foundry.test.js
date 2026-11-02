@@ -309,6 +309,17 @@ describe("the link", () => {
     expect(link.state().connected).toBe(false);
   });
 
+  it("fails a world fetch at once when the socket drops under it", async () => {
+    const f = fakeFoundry();
+    const { link } = linkFor(f);
+    link.start();
+    await until(() => link.state().connected);
+    f.worldPayload = undefined;
+    const pending = link.world({ fresh: true });
+    f.io.sockets.at(-1).fire("disconnect", "transport close");
+    await expect(pending).rejects.toThrow(/dropped/);
+  });
+
   it("answers no world while it is dark", async () => {
     const { link } = linkFor(fakeFoundry());
     expect(await link.world()).toBeNull();
@@ -326,25 +337,27 @@ describe("the probe", () => {
     expect(s.disconnected).toBe(true);
   });
 
-  it("remembers an answer for ten minutes and a refusal for thirty seconds", async () => {
+  it("asks Foundry on every request, so a session that changed hands is seen at once", async () => {
     const f = fakeFoundry();
-    let clock = 0;
-    const { link } = linkFor(f, { now: () => clock });
-    await link.probe(ADA_SESSION);
-    await link.probe(ADA_SESSION);
-    expect(f.io.sockets).toHaveLength(1);
-    clock += 9 * 60_000;
-    await link.probe(ADA_SESSION);
-    expect(f.io.sockets).toHaveLength(1);
-    clock += 2 * 60_000;
-    await link.probe(ADA_SESSION);
+    const { link } = linkFor(f, { now: () => 0 });
+    expect(await link.probe(ADA_SESSION)).toEqual({ userId: "playerAda0000001" });
+    expect(await link.probe(ADA_SESSION)).toEqual({ userId: "playerAda0000001" });
     expect(f.io.sockets).toHaveLength(2);
+  });
+
+  it("remembers a refusal for thirty seconds on a monotonic clock", async () => {
+    const f = fakeFoundry();
+    let clock = 1000;
+    const { link } = linkFor(f, { now: () => clock });
     expect(await link.probe("strangerSess000000000001")).toBeNull();
     expect(await link.probe("strangerSess000000000001")).toBeNull();
-    expect(f.io.sockets).toHaveLength(3);
-    clock += 31_000;
+    expect(f.io.sockets).toHaveLength(1);
+    clock += 29_000;
     await link.probe("strangerSess000000000001");
-    expect(f.io.sockets).toHaveLength(4);
+    expect(f.io.sockets).toHaveLength(1);
+    clock += 2_000;
+    await link.probe("strangerSess000000000001");
+    expect(f.io.sockets).toHaveLength(2);
   });
 
   it("refuses a session Foundry knows but that has not joined the world", async () => {

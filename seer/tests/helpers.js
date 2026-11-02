@@ -71,8 +71,11 @@ export function fakeIo(behave) {
         socket.emitted.push(event);
         const answer =
           event === "getJoinData" ? plan.joinData : event === "world" ? plan.world : undefined;
-        if (answer === undefined) return;
-        setImmediate(() => ack(typeof answer === "function" ? answer() : answer));
+        // An answer that is (or whose function returns) undefined is never sent: a Foundry that
+        // has stopped answering.
+        const value = typeof answer === "function" ? answer() : answer;
+        if (value === undefined) return;
+        setImmediate(() => ack(value));
       },
       disconnect() {
         if (socket.disconnected) return;

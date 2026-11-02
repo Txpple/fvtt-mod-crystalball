@@ -1,10 +1,18 @@
 import fs from "node:fs";
 import http from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createServer, createSse, HEARTBEAT_MS, normaliseBase } from "../src/http.js";
+import net from "node:net";
+import {
+  createServer,
+  createSse,
+  HEARTBEAT_MS,
+  KEEP_ALIVE_MS,
+  normaliseBase,
+  timeZone
+} from "../src/http.js";
 import { createLedger } from "../src/ledger.js";
 import { createLimits } from "../src/limits.js";
-import { DEFAULTS_FILE, loadConfig } from "../src/main.js";
+import { DEFAULTS_FILE, loadConfig } from "../src/config.js";
 import { createModel } from "../src/model.js";
 import { createSittings } from "../src/sittings.js";
 import { quietLog, tempDir, until, world } from "./helpers.js";
@@ -58,7 +66,7 @@ async function start({ w = world(), limits: caps = {}, model, probe, worldFn } =
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   running.push({ server, dir });
   const port = server.address().port;
-  return { port, state, link, log, ledger, sittings, limits, w };
+  return { port, state, link, log, ledger, sittings, limits, w, server };
 }
 
 /** A request with Node's own client: `{ status, headers, text, json }`. */
@@ -131,7 +139,8 @@ describe("healthz", () => {
       version: "9.9.9",
       foundry: { connected: true, worldOpen: true, world: "test-world", ballUser: "Crystal Ball" },
       model: "stub",
-      uptimeSeconds: 0
+      uptimeSeconds: 0,
+      timeZone: timeZone()
     });
     expect(link.probe).not.toHaveBeenCalled();
   });
@@ -306,7 +315,7 @@ describe("POST chat", () => {
     const res = await chat(s.port, "Where is the vault?");
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/^text\/event-stream/);
-    expect(res.headers["cache-control"]).toBe("no-cache");
+    expect(res.headers["cache-control"]).toBe("no-cache, no-transform");
     expect(res.headers["x-accel-buffering"]).toBe("no");
     const evs = events(res.text);
     expect(evs[0].event).toBe("meta");
@@ -383,7 +392,7 @@ describe("POST chat", () => {
     expect(seen[1].at(-1)).toEqual({ role: "user", content: "two" });
   });
 
-  it("ends the stream with the contract's error when the model fails, and keeps nothing", async () => {
+  it("ends the stream with the contract's error when the model fails, and counts the call", async () => {
     const model = {
       id: "claude-opus-5-5",
       stub: false,
@@ -400,15 +409,17 @@ describe("POST chat", () => {
       reason: "model",
       message: "the model call failed"
     });
-    expect(s.ledger.read()).toEqual([]);
+    const lines = s.ledger.read();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ outcome: "failed", cost: 0, userId: "playerAda0000001" });
     expect((await call(s.port, "sittings/current", { session: ADA })).json.turns).toEqual([]);
     expect((await call(s.port, "usage/me", { session: ADA })).json.user).toEqual({
-      hour: 0,
-      day: 0
+      hour: 1,
+      day: 1
     });
   });
 
-  it("aborts the model call when the client leaves, and keeps no turn", async () => {
+  it("aborts the model call when the client leaves, counts what it spent, and keeps no turn", async () => {
     let aborted = false;
     const model = {
       id: "claude-opus-5-5",
@@ -418,7 +429,13 @@ describe("POST chat", () => {
         new Promise((_resolve, reject) => {
           signal.addEventListener("abort", () => {
             aborted = true;
-            reject(signal.reason);
+            const spend = {
+              usage: { input: 9000, cacheWrite: 0, cacheRead: 0, output: 20 },
+              cost: 0.0364,
+              model: "claude-opus-5-5",
+              estimated: true
+            };
+            reject(Object.assign(signal.reason, { spend }));
           });
         })
     };
@@ -452,8 +469,122 @@ describe("POST chat", () => {
     });
     await until(() => aborted);
     await until(() => s.log.lines.some(l => /the client left/.test(l.message)));
-    expect(s.ledger.read()).toEqual([]);
+    const lines = s.ledger.read();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      outcome: "aborted",
+      cost: 0.0364,
+      estimated: true,
+      usage: { input: 9000, output: 20 }
+    });
     expect((await call(s.port, "sittings/current", { session: ADA })).json.turns).toEqual([]);
+    const usage = (await call(s.port, "usage/me", { session: ADA })).json;
+    expect(usage.user).toEqual({ hour: 1, day: 1 });
+    expect(usage.table.day.cost).toBeCloseTo(0.0364, 10);
+  });
+
+  it("asks the model nothing when the client leaves first, and counts nothing", async () => {
+    let release;
+    const gate = new Promise(r => {
+      release = r;
+    });
+    const answer = vi.fn();
+    const model = { id: "claude-opus-5-5", stub: false, countGaze: () => gate, answer };
+    const s = await start({ model });
+    await new Promise(resolve => {
+      const data = JSON.stringify({ message: "hi" });
+      const req = http.request({
+        host: "127.0.0.1",
+        port: s.port,
+        method: "POST",
+        path: "/crystalball/chat",
+        headers: {
+          "X-Foundry-Session": ADA,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data)
+        }
+      });
+      req.on("error", () => {});
+      req.write(data);
+      req.end(() =>
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 50)
+      );
+    });
+    await new Promise(r => setTimeout(r, 50));
+    release(10);
+    await until(() => s.log.lines.some(l => /before the model was asked/.test(l.message)));
+    expect(answer).not.toHaveBeenCalled();
+    expect(s.ledger.read()).toEqual([]);
+    expect((await call(s.port, "usage/me", { session: ADA })).json.user).toEqual({
+      hour: 0,
+      day: 0
+    });
+  });
+
+  it("still answers when the ledger cannot be written, and says so in the log", async () => {
+    const s = await start();
+    s.ledger.append = () => {
+      throw new Error("ENOSPC");
+    };
+    const evs = events((await chat(s.port, "hi")).text);
+    expect(evs.at(-1).event).toBe("done");
+    expect(s.log.lines.some(l => l.level === "error" && /ledger/.test(l.message))).toBe(true);
+    expect((await call(s.port, "usage/me", { session: ADA })).json.user.hour).toBe(1);
+  });
+});
+
+describe("a hostile or broken request", () => {
+  it("answers 400 to a request target the URL parser refuses, and keeps serving", async () => {
+    const { port } = await start();
+    const reply = await new Promise((resolve, reject) => {
+      const socket = net.connect(port, "127.0.0.1", () => {
+        socket.write(
+          [
+            "GET http://a:99999/crystalball/healthz HTTP/1.1",
+            "Host: a",
+            "Connection: close",
+            "",
+            ""
+          ].join("\r\n")
+        );
+      });
+      let text = "";
+      socket.on("data", c => {
+        text += c;
+      });
+      socket.on("end", () => resolve(text));
+      socket.on("error", reject);
+    });
+    expect(reply.startsWith("HTTP/1.1 400")).toBe(true);
+    expect((await call(port, "healthz")).status).toBe(200);
+  });
+
+  it("is 503 dark when the world fetch fails mid-request", async () => {
+    const { port } = await start({
+      worldFn: () => {
+        throw new Error("the socket dropped");
+      }
+    });
+    expect(await call(port, "usage/me", { session: ADA })).toMatchObject({
+      status: 503,
+      json: { error: "dark" }
+    });
+  });
+
+  it("is 403 for a banned user on a live session", async () => {
+    const w = world();
+    w.users.find(u => u._id === "playerAda0000001").role = 0;
+    expect((await call((await start({ w })).port, "usage/me", { session: ADA })).status).toBe(403);
+  });
+
+  it("keeps idle connections open longer than a tunnel's pool", async () => {
+    const s = await start();
+    expect(KEEP_ALIVE_MS).toBeGreaterThan(90000);
+    expect(s.server.keepAliveTimeout).toBe(KEEP_ALIVE_MS);
+    expect(s.server.headersTimeout).toBeGreaterThan(KEEP_ALIVE_MS);
   });
 });
 
@@ -495,7 +626,7 @@ describe("the SSE writer", () => {
     expect(res.headers).toMatchObject({
       status: 200,
       "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no",
       "Access-Control-Allow-Origin": ORIGIN
     });

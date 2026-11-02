@@ -58,7 +58,8 @@ export const isGM = user => (user?.role ?? 0) >= ROLES.ASSISTANT;
  * @param {{ gmGaze?: "player" | "all", parent?: object | null }} [options]
  */
 export function canObserve(doc, user, { gmGaze = "player", parent = null } = {}) {
-  if (!doc || !user?._id) return false;
+  // A banned user (role 0) observes nothing, whatever the document grants.
+  if (!doc || !user?._id || !((user.role ?? 0) >= ROLES.PLAYER)) return false;
   if (isGM(user)) {
     if (gmGaze === "all") return true;
     return (

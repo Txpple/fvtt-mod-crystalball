@@ -10,6 +10,8 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
+import { log } from "./log.js";
 
 /** A Foundry document id is alphanumeric; anything else never becomes a path. */
 const SAFE_ID = /^[A-Za-z0-9]{1,64}$/;
@@ -17,15 +19,29 @@ const SAFE_ID = /^[A-Za-z0-9]{1,64}$/;
 /** A closed sitting's file name: its start, with the colons Windows refuses in a name replaced. */
 export const archiveName = startedAt => `${String(startedAt).replace(/:/g, "-")}.json`;
 
-/** Create a directory and narrow it to its owner where the platform has modes. */
-export function ensureDir(dir) {
+const warned = new Set();
+
+/**
+ * Create a directory and narrow it to its owner. Windows has no POSIX modes (the directory's ACL
+ * governs), so a refusal there is expected; anywhere else it means the sittings may be readable
+ * by others, and it is said once per directory.
+ */
+export function ensureDir(dir, { platform = process.platform, warn = log.warn } = {}) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   try {
     fs.chmodSync(dir, 0o700);
-  } catch {
-    // A filesystem without POSIX modes (Windows): the directory's ACL governs instead.
+  } catch (err) {
+    if (platform === "win32" || warned.has(dir)) return;
+    warned.add(dir);
+    warn("storage: the data directory could not be narrowed to mode 0700", {
+      dir,
+      error: err.code ?? err.message
+    });
   }
 }
+
+/** A short synchronous pause, for a retry inside a synchronous write. */
+const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /** Write a file whole through a temporary file and a rename. */
 export function writeAtomic(file, text) {
@@ -38,7 +54,7 @@ export function writeAtomic(file, text) {
     fs.closeSync(fd);
   }
   // Windows can refuse a rename for a moment while another process (an indexer, an antivirus)
-  // holds the target open; a few quick retries ride that out.
+  // holds the target open; four retries 20, 40, 80 and 160 ms apart ride that out.
   for (let attempt = 0; ; attempt++) {
     try {
       fs.renameSync(tmp, file);
@@ -48,14 +64,20 @@ export function writeAtomic(file, text) {
         fs.rmSync(tmp, { force: true });
         throw err;
       }
+      pause(20 * 2 ** attempt);
     }
   }
 }
 
-/** The last turns that fit the window, starting on a player's turn (a conversation opens with one). */
+/**
+ * The last turns that fit the window, starting on a player's turn (a conversation opens with one).
+ * An empty turn is dropped: the API refuses an empty message, and one stored by an older build
+ * would otherwise reject every later call of the sitting.
+ */
 export function windowOf(turns, size) {
+  const said = turns.filter(t => typeof t?.text === "string" && t.text.trim());
   // slice(-0) is the whole list, so an empty window is said outright.
-  const recent = size > 0 ? turns.slice(-size) : [];
+  const recent = size > 0 ? said.slice(-size) : [];
   while (recent.length && recent[0].role !== "user") recent.shift();
   return recent;
 }

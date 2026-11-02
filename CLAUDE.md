@@ -24,7 +24,9 @@ in `seer/.env`.
   reads, the gaze's layers, the stub model's sentence. A change to it is made there first.
 - **Identity is Foundry's.** Every request carries the player's own session id; the Seer opens a socket to Foundry
   with it and reads the `session` event (`{ sessionId, userId }`); no user, no answer. The probe is side-effect
-  free for a connected player. The id is never logged (a hash keys the ten-minute cache).
+  free for a connected player and is asked on every request (Foundry rebinds a session id to whoever logs in next
+  on that browser, so a remembered answer would hand one player another's gaze); only a refusal is remembered, for
+  30 s. The id is never logged (a hash keys that memo).
 - **The ball's user is a Player, never a GM.** Foundry sends every document to every connected user whatever its
   role, so the role buys no reading; a GM-level socket that runs no modules would be elected the table's active GM
   while the DM is away and By the Books' consequences would land on it and die. The Seer writes nothing to
@@ -48,7 +50,10 @@ in `seer/.env`.
   the world Clue items); Card Catalogue's body class paints the button; nothing else is detected. No hook emitted,
   none listened to.
 - **Limits live in the Seer** (per user per hour and day, the table's day and month in dollars, the message length,
-  the sitting window, the gaze budget) and the window only reports them; a cap answers 429 with its scope.
+  the sitting window, the gaze budget) and the window only reports them; a cap answers 429 with its scope. A call
+  counts the moment the model is asked, whatever its end (`outcome` in the ledger line; an abandoned stream is
+  still billed, so it is still counted). The calendar follows the box's zone, which `healthz` reports and the
+  unit sets with `TZ`.
 - **Card Catalogue's look, a copy kept by hand** (the `--cb-*` palette under `crystalball-` classes): a change to
   either module's look is made in both. No `host.js`: the window opens nothing of its own, and the copied helper,
   which notes its host on every keystroke, pulled unrelated sheets into a detached ball (found in review).
@@ -67,7 +72,9 @@ in `seer/.env`.
 - `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `session.js` (the session id,
   the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
 - `scripts/common.js`, `scripts/kit/`.
-- `seer/src/`: `main.js`, `foundry.js` (join, the ball's socket, the probe, the world), `settings.js` (the module's
+- `seer/src/`: `main.js` (the entry: the Node 24 check, the process-level handlers, always runs), `config.js`
+  (the environment and the config file, BOM-tolerant, `DATA_DIR` from systemd's `STATE_DIRECTORY` when set),
+  `start.js`, `foundry.js` (join, the ball's socket, the probe, the world), `settings.js` (the module's
   world settings off the payload, user-scoped rows ignored, the module's active check), `permission.js`,
   `gaze.js`, `markdown.js` (the enrichers and turndown), `labels.js` (dnd5e's key-to-label maps), `sheet.js`,
   `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (versioned), `log.js`;

@@ -117,6 +117,13 @@ describe("canObserve", () => {
     expect(canObserve(shared, null)).toBe(false);
     expect(canObserve(shared, {})).toBe(false);
   });
+
+  it("gives a banned user (role 0) nothing, whatever the document grants", () => {
+    const banned = { _id: "playerA", role: 0 };
+    expect(canObserve(shared, banned)).toBe(false);
+    expect(canObserve(grantedA, banned)).toBe(false);
+    expect(canObserve({ ownership: { default: 3 } }, { _id: "x" })).toBe(false);
+  });
 });
 
 describe("the helpers", () => {

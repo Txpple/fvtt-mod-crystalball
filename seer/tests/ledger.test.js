@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createLedger, readLedger, sums } from "../src/ledger.js";
+import { createLedger, readLedger } from "../src/ledger.js";
 import { tempDir } from "./helpers.js";
 
 const dirs = [];
@@ -47,28 +47,5 @@ describe("the ledger", () => {
       `${JSON.stringify(line("2026-11-02T10:00:00.000Z", 1))}\n{"at":"2026-11-02T1`
     );
     expect(readLedger(path.join(dir, "usage.jsonl"))).toHaveLength(1);
-  });
-});
-
-describe("sums", () => {
-  it("adds the table's calendar day and month, local time", () => {
-    const now = new Date(2026, 10, 15, 12, 0);
-    const lines = [
-      line(new Date(2026, 10, 15, 1, 0).toISOString(), 0.5),
-      line(new Date(2026, 10, 15, 11, 0).toISOString(), 0.25),
-      line(new Date(2026, 10, 3, 9, 0).toISOString(), 2),
-      line(new Date(2026, 9, 31, 23, 0).toISOString(), 9),
-      line(new Date(2026, 10, 15, 13, 0).toISOString(), 100)
-    ];
-    expect(sums(lines, now)).toEqual({
-      day: { messages: 2, cost: 0.75 },
-      month: { messages: 3, cost: 2.75 }
-    });
-  });
-
-  it("starts a new month at local midnight on the first", () => {
-    const lines = [line(new Date(2026, 10, 30, 23, 59).toISOString(), 3)];
-    expect(sums(lines, new Date(2026, 11, 1, 0, 0, 1)).month).toEqual({ messages: 0, cost: 0 });
-    expect(sums(lines, new Date(2026, 10, 30, 23, 59, 30)).month).toEqual({ messages: 1, cost: 3 });
   });
 });

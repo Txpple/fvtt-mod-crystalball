@@ -12,8 +12,9 @@ The contract between the window and the Seer, every endpoint, header, event, err
 ## What it does for each request
 
 1. Reads the `X-Foundry-Session` header and asks Foundry whose session it is: a socket opened on that session
-   receives Foundry's `session` event `{ sessionId, userId }`. No user, no answer (401). The answer is remembered
-   ten minutes under a hash of the id; the id itself is never logged.
+   receives Foundry's `session` event `{ sessionId, userId }`. No user, no answer (401). Foundry keeps a
+   browser's session id across a logout and binds it to whoever logs in next, so the Seer asks on every request;
+   only a refusal is remembered (30 s, under a hash of the id). The id itself is never logged.
 2. Checks the world's own settings for the module (*Enabled*, *Who may ask*, *The GM's gaze*) and that the module
    is active in the world (403 otherwise).
 3. Checks the limits (413, 429).
@@ -23,7 +24,9 @@ The contract between the window and the Seer, every endpoint, header, event, err
    curated sheet. Each layer is a cached system block, so a party shares the first three. The gaze is never
    written to disk.
 5. Streams the model's answer as Server-Sent Events, then appends a line to the usage ledger and the turn to the
-   user's sitting.
+   user's sitting. A call that fails or is abandoned after the model was asked still gets its ledger line and
+   counts against the caps, priced from the stream's last usage or, failing that, estimated; only a finished
+   answer becomes a turn.
 
 The ball's user socket emits nothing but `world`; the Seer writes nothing to Foundry.
 
@@ -31,14 +34,16 @@ The ball's user socket emits nothing but `world`; the Seer writes nothing to Fou
 
 ```sh
 npm install
-cp seer/.env.example seer/.env   # fill in BALL_PASSWORD; leave ANTHROPIC_API_KEY empty for the stub
+cp seer/.env.example seer/.env   # fill in BALL_PASSWORD, uncomment the sandbox's CORS_ORIGIN line;
+                                 # leave ANTHROPIC_API_KEY empty for the stub
 npm run seer:dev
-curl -s http://localhost:30001/crystalball/healthz
+curl -s http://127.0.0.1:30001/crystalball/healthz
 ```
 
 The sandbox's world setting *Service URL* is `http://localhost:30001/crystalball` and `CORS_ORIGIN` is Foundry's
-own origin (`http://localhost:30000`), the one origin allowed to call across ports. `LOG_LEVEL=debug` prints each
-call's layer sizes, the gaze's meta and the cache figures.
+origin as the browser has it (`http://localhost:30000`), the one origin allowed to call across ports.
+`LOG_LEVEL=debug` prints each call's layer sizes, the gaze's meta and the cache figures. The entry point is
+`seer/src/main.js` (it checks for Node 24 and loads `start.js`); `config.js` reads the environment and the config.
 
 Without `ANTHROPIC_API_KEY` (or with `MODEL_STUB=1`) the Seer makes no API call: it answers the contract's stub
 sentence, which names what the gaze holds, so a live check can assert on it for nothing.
@@ -58,24 +63,28 @@ The environment only: `seer/.env` on a sandbox (passed by `npm run seer:dev`), t
 box. The variables are the contract's *Environment* table. `config.json` holds the committed defaults (model,
 effort, output cap, cache TTL, the refusal fallback, the limits, the prices, the sitting retention, the call
 timeout); `CONFIG` may name another file whose keys override them. Relative `DATA_DIR` and `CONFIG` paths are taken
-from the repository root.
+from the repository root; on a box give absolute ones. A config file written with a byte-order mark (Windows
+PowerShell's) is read as well.
 
 ## Limits
 
 All enforced in the Seer, whatever the window says: 10 messages per user in a rolling hour and 40 per calendar day,
-$5 a day and $25 a month for the whole table (from the ledger, the box's local calendar), 4,000 characters a
+$5 a day and $25 a month for the whole table (from the ledger, the calendar of the process's zone, `TZ`, which
+`healthz` reports), 4,000 characters a
 message, a 16 KB request body, 24 turns of the sitting sent with each message, a 120,000-token gaze (past it the
 oldest lore pages are cut to their titles and a warning is logged), and a 60-second call, aborted when the player's
 connection drops. Set a spend limit on the key in the Console as well.
 
 ## What it stores
 
-Under `DATA_DIR` (`seer/data` by default, gitignored, mode 0700 where the platform has modes):
+Under `DATA_DIR`; unset, under systemd's `STATE_DIRECTORY` (the unit's `StateDirectory=`, `/var/lib/crystalball`),
+else `seer/data` in the clone (gitignored). Mode 0700 where the platform has modes:
 
 - `sittings/<userId>/current.json`: the open sitting (its turns and running usage, never the gaze);
 - `sittings/<userId>/<startedAt>.json`: closed sittings, deleted after 90 days (at start and daily);
 - `usage.jsonl`: one line per model call: when, who, the model, the four token counts, the cost, a hash per
-  layer, the latency, whether it was the stub. Counts and hashes, never words.
+  layer, the latency, whether it was the stub, the outcome (`done`, `aborted` or `failed`) and `estimated` when
+  the spend was worked out rather than reported. Counts and hashes, never words.
 
 **The DM can read every sitting on the box**, and the window tells players so. What a player asks and the gaze it
 was answered from go to the Claude API under its terms.

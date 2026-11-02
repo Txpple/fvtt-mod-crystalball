@@ -163,8 +163,17 @@ export function journalFor(world, user, { gmGaze = "player", nameOf } = {}) {
 
 const TRIMMED = "(Only the title fits in the ball's view: the gaze is over its budget.)";
 
+/**
+ * World text inside one of the gaze's tags. Its angle brackets become ‹ and ›, so a page, a
+ * clue or a name holding `</lore><own>` cannot close the section it sits in or open another; the
+ * Seer's own instructions and the DM's table notes never pass through here.
+ */
+export const guard = text => String(text).replace(/</g, "‹").replace(/>/g, "›");
+
+const wrap = (tag, parts) => `<${tag}>\n\n${guard(parts.join("\n\n"))}\n\n</${tag}>`;
+
 function loreText(lore, trimmed) {
-  const out = ["<lore>", "# Shared lore: the journal pages every player can read"];
+  const out = ["# Shared lore: the journal pages every player can read"];
   if (!lore.length) out.push("No journal page is shared with every player.");
   for (const { entry, pages } of lore) {
     out.push(`## ${entry.name}`);
@@ -174,8 +183,7 @@ function loreText(lore, trimmed) {
       if (text) out.push(text);
     }
   }
-  out.push("</lore>");
-  return out.join("\n\n");
+  return wrap("lore", out);
 }
 
 /* -------------------------------------------- */
@@ -238,22 +246,25 @@ export function clueBoardOf(world, group) {
     .map(([id, e]) => {
       const item = itemsById.get(id);
       const clue = item?.type === CLUE_TYPE ? item : null;
-      const snap = e.snapshot ?? {};
-      const readers = Object.values(e.readers ?? {})
+      // Flags are anyone's to write who owns the party, outside Clue Board's schema too: every
+      // field is made a string before it is sorted or converted, so one odd entry cannot fail
+      // the whole party's layer.
+      const snap = e.snapshot && typeof e.snapshot === "object" ? e.snapshot : {};
+      const readers = Object.values(e.readers && typeof e.readers === "object" ? e.readers : {})
         .filter(r => r && typeof r === "object")
         .sort(
           (a, b) =>
             String(a.at ?? "").localeCompare(String(b.at ?? "")) ||
             String(a.actorId).localeCompare(String(b.actorId))
         )
-        .map(r => actorsById.get(r.actorId)?.name ?? r.actorName ?? "")
+        .map(r => String(actorsById.get(r.actorId)?.name ?? r.actorName ?? ""))
         .filter(Boolean);
       return {
         id,
-        name: clue?.name ?? snap.name ?? "",
-        kind: clue?.system?.kind ?? e.kind ?? snap.kind ?? "",
-        foundAt: clue?.system?.foundAt ?? snap.foundAt ?? "",
-        html: clue?.system?.text ?? snap.html ?? "",
+        name: String(clue?.name ?? snap.name ?? ""),
+        kind: String(clue?.system?.kind ?? e.kind ?? snap.kind ?? ""),
+        foundAt: String(clue?.system?.foundAt ?? snap.foundAt ?? ""),
+        html: String(clue?.system?.text ?? snap.html ?? ""),
         readers: [...new Set(readers)],
         notes: typeof e.notes === "string" ? e.notes : "",
         realDate: String(e.foundIn?.realDate ?? ""),
@@ -294,12 +305,11 @@ export function clueBoardOf(world, group) {
 }
 
 function partyText(world, group, { nameOf }) {
-  const out = ["<party>"];
   if (!group) {
-    out.push("No party: the asker plays no character in a party the ball can see.", "</party>");
-    return { text: out.join("\n\n"), members: 0, clues: 0 };
+    const none = ["No party: the asker plays no character in a party the ball can see."];
+    return { text: wrap("party", none), members: 0, clues: 0 };
   }
-  out.push(`# The party: ${group.name}`);
+  const out = [`# The party: ${group.name}`];
   const actorsById = new Map((world?.actors ?? []).map(a => [a._id, a]));
   const members = memberIds(group)
     .map(id => actorsById.get(id))
@@ -349,8 +359,7 @@ function partyText(world, group, { nameOf }) {
       }
     }
   }
-  out.push("</party>");
-  return { text: out.join("\n\n"), members: members.length, clues: board.entries.length };
+  return { text: wrap("party", out), members: members.length, clues: board.entries.length };
 }
 
 /* -------------------------------------------- */
@@ -369,7 +378,7 @@ function askerLine(user, gmGaze) {
 }
 
 function ownText(user, characters, ownPages, { gmGaze, nameOf }) {
-  const out = ["<own>", "# Yours alone", askerLine(user, gmGaze)];
+  const out = ["# Yours alone", askerLine(user, gmGaze)];
   out.push(
     characters.length
       ? `They play: ${characters.map(c => c.name).join(", ")}.`
@@ -386,8 +395,7 @@ function ownText(user, characters, ownPages, { gmGaze, nameOf }) {
     }
   }
   for (const actor of characters) out.push(curatedSheet(actor, { nameOf }));
-  out.push("</own>");
-  return out.join("\n\n");
+  return wrap("own", out);
 }
 
 /* -------------------------------------------- */
@@ -422,27 +430,23 @@ export function buildGaze(
   const own = layer("own", ownText(user, characters, ownPages, { gmGaze, nameOf }));
   const partyLayer = layer("party", party.text);
 
-  // Over budget: the oldest lore pages (lowest sort key within their entries first) give up
-  // their text and keep their titles, one at a time, until the gaze fits.
+  // Over budget: the oldest lore gives up its text and keeps its titles, the first entry in
+  // folder order first and its pages in their order, until the gaze fits. A cut changes the
+  // lore's length by exactly the page's text less the notice, so the total is kept by
+  // subtraction and the layer is built once.
   const trimmed = new Set();
-  let loreLayer = layer("lore", loreText(lore, trimmed));
-  const total = () =>
-    instructions.estTokens + loreLayer.estTokens + partyLayer.estTokens + own.estTokens;
+  const others = instructions.estTokens + partyLayer.estTokens + own.estTokens;
+  let loreChars = loreText(lore, trimmed).length;
+  const total = () => others + Math.ceil(loreChars / 4);
   if (total() > budgetTokens) {
     const before = total();
     const candidates = lore
-      .flatMap(({ pages }, entryIndex) => pages.map(p => ({ ...p, entryIndex })))
-      .filter(p => p.body && p.page.type === "text")
-      .sort(
-        (a, b) =>
-          (num(a.page.sort) ?? 0) - (num(b.page.sort) ?? 0) ||
-          a.entryIndex - b.entryIndex ||
-          String(a.page._id).localeCompare(String(b.page._id))
-      );
+      .flatMap(({ pages }) => pages)
+      .filter(p => p.page.type === "text" && p.body.length > TRIMMED.length);
     for (const c of candidates) {
       if (total() <= budgetTokens) break;
       trimmed.add(c.page);
-      loreLayer = layer("lore", loreText(lore, trimmed));
+      loreChars -= c.body.length - TRIMMED.length;
     }
     warn("gaze over budget: oldest lore pages cut to their titles", {
       userId,
@@ -452,6 +456,7 @@ export function buildGaze(
       pagesCut: trimmed.size
     });
   }
+  const loreLayer = layer("lore", loreText(lore, trimmed));
 
   const main = characters[0] ?? null;
   return {

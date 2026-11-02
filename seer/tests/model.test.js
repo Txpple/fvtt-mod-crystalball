@@ -3,7 +3,9 @@ import {
   cacheMarker,
   costOf,
   createModel,
+  EMPTY_TEXT,
   FALLBACK_BETA,
+  priceUsage,
   REFUSAL_TEXT,
   requestParams,
   stubAnswer,
@@ -39,21 +41,33 @@ const layers = ["instructions", "lore", "party", "own"].map(name => ({
 }));
 const messages = [{ role: "user", content: "What do we know?" }];
 
-/** A fake Anthropic client that records each call and streams what it is told to. */
-function fakeClient({ deltas = ["Hello", " there."], final = {}, fail = null, count = 1234 } = {}) {
-  const calls = { plain: [], beta: [], count: 0 };
+/**
+ * A fake Anthropic client that records each call and streams what it is told to. `fail` throws
+ * after the deltas when `failAfterDeltas`, else before any; `snapshot` is the stream's usage so far.
+ */
+function fakeClient({
+  deltas = ["Hello", " there."],
+  final = {},
+  fail = null,
+  failAfterDeltas = false,
+  snapshot = null,
+  count = 1234
+} = {}) {
+  const calls = { plain: [], beta: [], count: 0, countOptions: [] };
   const stream = (kind, params, options) => {
     calls[kind].push({ params, options });
     const handlers = {};
     return {
+      currentMessage: snapshot ? { model: "claude-opus-5-5", usage: snapshot } : undefined,
       on(event, fn) {
         handlers[event] = fn;
         return this;
       },
       async finalMessage() {
         const f = typeof fail === "function" ? fail(kind) : fail;
-        if (f) throw f;
+        if (f && !failAfterDeltas) throw f;
         for (const d of deltas) handlers.text?.(d, "");
+        if (f) throw f;
         return {
           model: "claude-opus-5-5",
           stop_reason: "end_turn",
@@ -73,8 +87,10 @@ function fakeClient({ deltas = ["Hello", " there."], final = {}, fail = null, co
     calls,
     messages: {
       stream: (p, o) => stream("plain", p, o),
-      countTokens: async () => {
+      countTokens: async (_params, options) => {
         calls.count++;
+        calls.countOptions.push(options);
+        if (count instanceof Error) throw count;
         return { input_tokens: count };
       }
     },
@@ -328,5 +344,130 @@ describe("usage and cost", () => {
       10
     );
     expect(costOf(usage, {}, undefined, "5m")).toBe(0);
+  });
+});
+
+describe("what an unfinished call spent", () => {
+  const call = (model, extra = {}) =>
+    model.answer({ layers, messages, meta: {}, message: "x", onDelta: () => {}, ...extra });
+  const chars = layers.reduce((s, l) => s + l.text.length, 0) + "What do we know?".length;
+
+  it("is the stream's last usage when one arrived, with the words that came", async () => {
+    const snapshot = {
+      input_tokens: 300,
+      cache_creation_input_tokens: 1000,
+      cache_read_input_tokens: 2000,
+      output_tokens: 1
+    };
+    const fail = Object.assign(new Error("stream broke"), { status: undefined });
+    const client = fakeClient({ deltas: ["a".repeat(400)], fail, failAfterDeltas: true, snapshot });
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const err = await call(model).catch(e => e);
+    expect(err.spend.usage).toEqual({ input: 300, cacheWrite: 1000, cacheRead: 2000, output: 100 });
+    expect(err.spend.cost).toBeCloseTo((300 * 4 + 1000 * 5 + 2000 * 0.2 + 100 * 20) / 1e6, 12);
+    expect(err.spend.estimated).toBe(false);
+  });
+
+  it("is the gaze estimated at the input price when the call was abandoned before any usage came", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("the client left"));
+    const client = fakeClient({
+      fail: Object.assign(new Error("Request was aborted."), { name: "AbortError" })
+    });
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const err = await call(model, { signal: controller.signal }).catch(e => e);
+    expect(err.spend).toMatchObject({
+      usage: { input: Math.ceil(chars / 4), output: 0 },
+      estimated: true
+    });
+    expect(err.spend.cost).toBeCloseTo((Math.ceil(chars / 4) * 4) / 1e6, 12);
+  });
+
+  it("is nothing for an HTTP refusal before any stream, which is not billed", async () => {
+    const client = fakeClient({ fail: Object.assign(new Error("overloaded"), { status: 529 }) });
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const err = await call(model).catch(e => e);
+    expect(err.spend).toEqual({
+      usage: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
+      cost: 0,
+      model: "claude-opus-5-5",
+      estimated: false
+    });
+  });
+
+  it("is the stub's estimate, free, when a stub answer is abandoned", async () => {
+    const model = createModel({ config: CONFIG, log: quietLog() });
+    const err = await call(model, { signal: AbortSignal.abort(new Error("gone")) }).catch(e => e);
+    expect(err.spend).toMatchObject({ cost: 0, model: "stub", estimated: true });
+  });
+});
+
+describe("an answer with no words", () => {
+  it("is stored as the ball's fixed sentence, never as an empty turn", async () => {
+    for (const stop_reason of ["max_tokens", "pause_turn", "end_turn"]) {
+      const client = fakeClient({
+        deltas: [],
+        final: { stop_reason, content: [{ type: "thinking", thinking: "" }] }
+      });
+      const model = createModel({ config: CONFIG, log: quietLog(), client });
+      const pieces = [];
+      const result = await model.answer({
+        layers,
+        messages,
+        meta: {},
+        message: "x",
+        onDelta: p => pieces.push(p)
+      });
+      expect(result.text).toBe(EMPTY_TEXT);
+      expect(pieces).toEqual([EMPTY_TEXT]);
+    }
+    expect(EMPTY_TEXT).toBe("The ball clouds over and shows nothing.");
+  });
+});
+
+describe("a turn served across models", () => {
+  it("prices each hop at its own model when the usage lists the hops", () => {
+    const raw = {
+      input_tokens: 100,
+      output_tokens: 10,
+      iterations: [
+        {
+          type: "message",
+          model: "claude-opus-5-5",
+          input_tokens: 100,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          output_tokens: 5
+        },
+        {
+          type: "fallback_message",
+          model: "claude-sonnet-5-5",
+          input_tokens: 100,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          output_tokens: 10
+        }
+      ]
+    };
+    expect(priceUsage(raw, "claude-opus-5-5", CONFIG)).toBeCloseTo(
+      (100 * 4 + 5 * 20 + 100 * 2 + 10 * 10) / 1e6,
+      12
+    );
+    expect(
+      priceUsage({ input_tokens: 100, output_tokens: 10 }, "claude-opus-5-5", CONFIG)
+    ).toBeCloseTo((100 * 4 + 10 * 20) / 1e6, 12);
+  });
+});
+
+describe("count_tokens", () => {
+  it("is given ten seconds and no retries, and a failure falls back to the estimate", async () => {
+    const client = fakeClient();
+    await createModel({ config: CONFIG, log: quietLog(), client }).countGaze(layers);
+    expect(client.calls.countOptions[0].signal).toBeInstanceOf(AbortSignal);
+    expect(client.calls.countOptions[0].maxRetries).toBe(0);
+    const slow = fakeClient({ count: new Error("timed out") });
+    expect(
+      await createModel({ config: CONFIG, log: quietLog(), client: slow }).countGaze(layers)
+    ).toBe(12);
   });
 });

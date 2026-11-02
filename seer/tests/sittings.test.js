@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { archiveName, createSittings, windowOf, writeAtomic } from "../src/sittings.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { archiveName, createSittings, ensureDir, windowOf, writeAtomic } from "../src/sittings.js";
 import { tempDir } from "./helpers.js";
 
 const dirs = [];
@@ -72,6 +72,17 @@ describe("the window", () => {
     expect(windowOf(turns, 0)).toEqual([]);
   });
 
+  it("drops an empty turn, which the API would refuse", () => {
+    const turns = [
+      turn("user", 1),
+      { role: "ball", text: "  ", at: "x" },
+      turn("user", 2),
+      { role: "ball", text: "", at: "y" },
+      turn("ball", 3)
+    ];
+    expect(windowOf(turns, 24).map(t => t.text)).toEqual(["user 1", "user 2", "ball 3"]);
+  });
+
   it("leaves room for the new message", () => {
     const store = createSittings({ dir: fresh(), turnsWindow: 24 });
     const s = { turns: Array.from({ length: 40 }, (_, i) => turn(i % 2 ? "ball" : "user", i)) };
@@ -134,6 +145,27 @@ describe("retention", () => {
 
   it("sweeps nothing before the first sitting", () => {
     expect(createSittings({ dir: fresh() }).sweep()).toBe(0);
+  });
+});
+
+describe("ensureDir", () => {
+  it("says once when it cannot narrow a directory's mode, except on Windows", () => {
+    const dir = fresh();
+    const spy = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+      throw Object.assign(new Error("not permitted"), { code: "EPERM" });
+    });
+    try {
+      const said = [];
+      const warn = (m, f) => said.push({ m, f });
+      ensureDir(path.join(dir, "a"), { platform: "win32", warn });
+      expect(said).toEqual([]);
+      ensureDir(path.join(dir, "b"), { platform: "linux", warn });
+      ensureDir(path.join(dir, "b"), { platform: "linux", warn });
+      expect(said).toHaveLength(1);
+      expect(said[0].f.error).toBe("EPERM");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

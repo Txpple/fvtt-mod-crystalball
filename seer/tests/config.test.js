@@ -1,8 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULTS_FILE, loadConfig, readEnv, readVersion, REPO_DIR } from "../src/main.js";
-import { moduleSettings, SETTING_DEFAULTS } from "../src/settings.js";
+import {
+  DEFAULTS_FILE,
+  loadConfig,
+  readEnv,
+  readVersion,
+  REPO_DIR,
+  stripBom
+} from "../src/config.js";
+import { mayAsk, moduleSettings, SETTING_DEFAULTS } from "../src/settings.js";
 import { tempDir } from "./helpers.js";
 
 const dirs = [];
@@ -153,5 +160,119 @@ describe("the module's settings", () => {
       gmGaze: "player",
       tableNotes: ""
     });
+  });
+});
+
+describe("a box's configuration", () => {
+  it("keeps the data in systemd's state directory when DATA_DIR is unset", () => {
+    const state = path.join(REPO_DIR, "state-dir-for-the-test");
+    expect(readEnv({ STATE_DIRECTORY: state }).dataDir).toBe(state);
+    expect(readEnv({ STATE_DIRECTORY: `${state}${path.delimiter}${state}-two` }).dataDir).toBe(
+      state
+    );
+    expect(readEnv({ STATE_DIRECTORY: state, DATA_DIR: path.join(REPO_DIR, "mine") }).dataDir).toBe(
+      path.join(REPO_DIR, "mine")
+    );
+  });
+
+  it("reads a config file that opens with a byte-order mark", () => {
+    const dir = tempDir("config");
+    dirs.push(dir);
+    const file = path.join(dir, "config.json");
+    fs.writeFileSync(file, `﻿${JSON.stringify({ effort: "medium" })}`);
+    expect(loadConfig(file).effort).toBe("medium");
+    expect(stripBom("﻿{}")).toBe("{}");
+    expect(stripBom("{}")).toBe("{}");
+  });
+
+  it("refuses a count cap of 0, and allows a dollar ceiling of 0 as an off switch", () => {
+    const dir = tempDir("config");
+    dirs.push(dir);
+    const file = path.join(dir, "config.json");
+    fs.writeFileSync(file, JSON.stringify({ limits: { perUserHour: 0, perUserDay: 1.5 } }));
+    expect(() => loadConfig(file)).toThrow(/limits\.perUserHour, limits\.perUserDay/);
+    fs.writeFileSync(file, JSON.stringify({ limits: { tableDayUsd: 0 } }));
+    expect(loadConfig(file).limits.tableDayUsd).toBe(0);
+  });
+});
+
+describe("whose settings count", () => {
+  const users = [
+    { _id: "gmUser0000000001", role: 4 },
+    { _id: "assistGm00000001", role: 3 },
+    { _id: "playerAda0000001", role: 1 }
+  ];
+
+  it("ignores a world row a player last wrote (a forged user row) and keeps the DM's", () => {
+    const s = moduleSettings({
+      users,
+      settings: [
+        {
+          key: "fvtt-mod-crystalball.tableNotes",
+          user: null,
+          value: '"forged"',
+          _stats: { lastModifiedBy: "playerAda0000001" }
+        },
+        {
+          key: "fvtt-mod-crystalball.tableNotes",
+          user: null,
+          value: '"the DM\'s"',
+          _stats: { lastModifiedBy: "gmUser0000000001" }
+        },
+        {
+          key: "fvtt-mod-crystalball.askers",
+          user: null,
+          value: '"listed"',
+          _stats: { lastModifiedBy: "playerAda0000001" }
+        },
+        {
+          key: "fvtt-mod-crystalball.gmGaze",
+          user: null,
+          value: '"all"',
+          _stats: { lastModifiedBy: "assistGm00000001" }
+        },
+        {
+          key: "fvtt-mod-crystalball.enabled",
+          user: null,
+          value: "false",
+          _stats: { lastModifiedBy: "someoneGone00001" }
+        }
+      ]
+    });
+    expect(s).toMatchObject({
+      tableNotes: "the DM's",
+      askers: "players",
+      gmGaze: "all",
+      enabled: true
+    });
+  });
+
+  it("trusts a row with no record of who wrote it", () => {
+    expect(
+      moduleSettings({
+        users,
+        settings: [{ key: "fvtt-mod-crystalball.tableNotes", user: null, value: '"x"' }]
+      }).tableNotes
+    ).toBe("x");
+    expect(
+      moduleSettings({
+        users,
+        settings: [
+          {
+            key: "fvtt-mod-crystalball.tableNotes",
+            user: null,
+            value: '"y"',
+            _stats: { lastModifiedBy: null }
+          }
+        ]
+      }).tableNotes
+    ).toBe("y");
+  });
+
+  it("lets no banned user ask", () => {
+    const open = moduleSettings({ settings: [] });
+    expect(mayAsk(open, { _id: "a", role: 1 })).toBe(true);
+    expect(mayAsk(open, { _id: "a", role: 0 })).toBe(false);
+    expect(mayAsk(open, { _id: "a" })).toBe(false);
   });
 });

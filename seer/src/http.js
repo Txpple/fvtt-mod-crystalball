@@ -19,6 +19,15 @@ export const BODY_LIMIT = 16 * 1024;
 
 export const HEARTBEAT_MS = 15000;
 
+/** Above cloudflared's 90 s origin pool, so the Seer never closes a connection the tunnel reuses. */
+export const KEEP_ALIVE_MS = 95000;
+
+/**
+ * The zone the limits' calendar days and months follow: the process's (TZ, else the box's).
+ * `healthz` reports it, so the DM can see when a server's UTC would reset players' days mid-session.
+ */
+export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+
 /** "/crystalball/" → "/crystalball"; "/" or "" → "" (no prefix). */
 export function normaliseBase(basePath) {
   const trimmed = String(basePath ?? "")
@@ -58,7 +67,8 @@ export function createSse(res, { heartbeatMs = HEARTBEAT_MS } = {}) {
     open(headers = {}) {
       res.writeHead(200, {
         "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
+        // no-transform: no edge may compress or rewrite the stream, which would hold the deltas.
+        "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
         "X-Content-Type-Options": "nosniff",
         Connection: "keep-alive",
@@ -173,11 +183,18 @@ export function createServer({
       throw dark("foundry-disconnected");
     }
     if (!who?.userId) throw unknownSession();
-    let world = await link.world();
-    // A user made in the last minute is not in a cached payload yet.
-    if (world && !world.users?.some(u => u._id === who.userId))
-      world = await link.world({ fresh: true });
-    if (!world) throw dark(link.state().connected ? "world-closed" : "foundry-disconnected");
+    const darkNow = () => dark(link.state().connected ? "world-closed" : "foundry-disconnected");
+    let world;
+    try {
+      world = await link.world();
+      // A user made in the last minute is not in a cached payload yet.
+      if (world && !world.users?.some(u => u._id === who.userId))
+        world = await link.world({ fresh: true });
+    } catch {
+      // The socket dropped mid-fetch (Foundry restarting): dark, not a server error.
+      throw darkNow();
+    }
+    if (!world) throw darkNow();
     const user = (world.users ?? []).find(u => u._id === who.userId);
     if (!user) throw unknownSession();
     ctx.userId = user._id;
@@ -187,6 +204,13 @@ export function createServer({
   }
 
   async function chat(req, res, ctx, cors) {
+    // Watched from the first byte, so a client that leaves while the Seer probes, fetches the
+    // world or counts the gaze is never answered, and one that leaves mid-answer aborts the call.
+    const controller = new AbortController();
+    const left = () => controller.signal.aborted;
+    res.on("close", () => {
+      if (!res.writableEnded) controller.abort(new Error("the client left"));
+    });
     const body = await readJson(req, { limit: BODY_LIMIT, tooLong });
     const message = typeof body?.message === "string" ? body.message : "";
     if (!message.trim()) throw new HttpError(400, { error: "seer", message: "no message" });
@@ -196,6 +220,8 @@ export function createServer({
 
     const ticket = limits.reserve(user._id);
     let settled = false;
+    let sse = null;
+    let doneSent = false;
     try {
       const gaze = buildGaze(world, user._id, settings, {
         budgetTokens: config.limits.gazeBudgetTokens,
@@ -209,16 +235,12 @@ export function createServer({
         { role: "user", content: message }
       ];
       const gazeTokens = await model.countGaze(gaze.layers);
-      const controller = new AbortController();
-      let gone = false;
-      res.on("close", () => {
-        if (!res.writableEnded) {
-          gone = true;
-          controller.abort(new Error("the client left"));
-        }
-      });
+      if (left() || res.destroyed) {
+        log.info("chat: the client left before the model was asked", { userId: user._id });
+        return;
+      }
 
-      const sse = createSse(res, { heartbeatMs });
+      sse = createSse(res, { heartbeatMs });
       sse.open(cors);
       ctx.sse = sse;
       const layerTokens = Object.fromEntries(gaze.layers.map(l => [l.name, l.estTokens]));
@@ -233,6 +255,36 @@ export function createServer({
 
       const at = now();
       const t0 = Date.now();
+      // Once the model is asked, every way out counts the call: the caps and the dollar
+      // ceilings see what the API bills, whether the answer finished, failed or was abandoned.
+      const record = (spend, outcome) => {
+        limits.commit(ticket, spend.cost);
+        settled = true;
+        try {
+          ledger.append({
+            at: at.toISOString(),
+            userId: user._id,
+            userName: user.name,
+            model: spend.model,
+            usage: spend.usage,
+            cost: spend.cost,
+            gazeTokens,
+            layers: Object.fromEntries(gaze.layers.map(l => [l.name, l.hash])),
+            latencyMs: Date.now() - t0,
+            stub: Boolean(model.stub),
+            outcome,
+            ...(spend.estimated ? { estimated: true } : {})
+          });
+        } catch (err) {
+          log.error(
+            "ledger: the usage line could not be written; this call is counted until a restart only",
+            {
+              error: err?.message
+            }
+          );
+        }
+      };
+
       let result;
       try {
         result = await model.answer({
@@ -244,46 +296,45 @@ export function createServer({
           onDelta: text => sse.send("delta", { text })
         });
       } catch (err) {
-        if (gone) {
-          log.info("chat: the client left; the model call was aborted", { userId: user._id });
+        const spend = err?.spend ?? {
+          usage: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
+          cost: 0,
+          model: model.id
+        };
+        if (left()) {
+          record(spend, "aborted");
+          log.info("chat: the client left; the model call was aborted", {
+            userId: user._id,
+            cost: spend.cost
+          });
           return;
         }
+        record(spend, "failed");
         log.error("chat: the model call failed", {
           userId: user._id,
           status: err?.status,
-          error: err?.message
+          error: err?.message,
+          cost: spend.cost
         });
         sse.send("error", { error: "dark", reason: "model", message: "the model call failed" });
-        sse.close();
         return;
       }
 
-      const latencyMs = Date.now() - t0;
-      ledger.append({
-        at: at.toISOString(),
-        userId: user._id,
-        userName: user.name,
-        model: result.model,
-        usage: result.usage,
-        cost: result.cost,
-        gazeTokens,
-        layers: Object.fromEntries(gaze.layers.map(l => [l.name, l.hash])),
-        latencyMs,
-        stub: Boolean(model.stub)
-      });
-      limits.commit(ticket, result.cost);
-      settled = true;
+      record(result, "done");
       if (logEnabled("debug")) {
         log.debug("chat: answered", {
           userId: user._id,
           usage: result.usage,
           cost: result.cost,
-          latencyMs,
+          latencyMs: Date.now() - t0,
           stop: result.stopReason
         });
       }
       // The contract: a turn is stored only when `done` is sent; a client that left gets neither.
-      if (gone) return;
+      if (left() || res.destroyed) return;
+      const { remaining } = limits.report(user._id);
+      sse.send("done", { text: result.text, usage: result.usage, cost: result.cost, remaining });
+      doneSent = true;
       sittings.append(
         user._id,
         [
@@ -292,11 +343,19 @@ export function createServer({
         ],
         { cost: result.cost, model: result.model }
       );
-      const { remaining } = limits.report(user._id);
-      sse.send("done", { text: result.text, usage: result.usage, cost: result.cost, remaining });
-      sse.close();
+    } catch (err) {
+      if (!sse) throw err;
+      // The stream is open: its last event is the contract's error event (unless `done` already
+      // went, when the failure is only logged).
+      log.error("chat: failed with the stream open", {
+        userId: user._id,
+        error: err?.message ?? String(err)
+      });
+      if (!doneSent) sse.send("error", { error: "seer", message: "internal error" });
     } finally {
       if (!settled) limits.release(ticket);
+      // Every way out stops the heartbeat and ends the stream.
+      sse?.close();
     }
   }
 
@@ -309,7 +368,8 @@ export function createServer({
           version,
           foundry: link.state(),
           model: model.id,
-          uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000)
+          uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+          timeZone: timeZone()
         },
         cors
       ),
@@ -350,7 +410,16 @@ export function createServer({
   const server = http.createServer((req, res) => {
     const t0 = Date.now();
     const ctx = { userId: null, sse: null };
-    const pathname = new URL(req.url ?? "/", "http://seer").pathname.replace(/\/+$/, "");
+    let pathname;
+    try {
+      pathname = new URL(req.url ?? "/", "http://seer").pathname.replace(/\/+$/, "");
+    } catch {
+      // An absolute-form target with a bad port and the like: the URL parser throws, and a
+      // throw here would take the process (and every open stream) down.
+      json(res, 400, { error: "seer", message: "bad request target" }, {});
+      req.resume();
+      return;
+    }
     const route = base
       ? pathname.startsWith(`${base}/`)
         ? pathname.slice(base.length + 1)
@@ -413,5 +482,10 @@ export function createServer({
       req.resume();
     });
   });
+  // A tunnel or proxy pools its connections to the Seer (cloudflared for 90 s); Node's 5 s
+  // default would close one under it, and the next POST on it would fail with a 502. The
+  // headers timeout must stay above the keep-alive one.
+  server.keepAliveTimeout = KEEP_ALIVE_MS;
+  server.headersTimeout = KEEP_ALIVE_MS + 5000;
   return server;
 }
