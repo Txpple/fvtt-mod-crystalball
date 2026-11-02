@@ -12,7 +12,8 @@ Plain ES modules, no build step, no libWrapper, no socketlib, MIT.
 `docs/seer-contract.md`, three reviews applied, `npm run verify` green, 314 tests, `tools/live-check.mjs --walk`
 GREEN in stub mode), then run on the real model the same morning: the user's key in the gitignored `seer/.env` (a
 Console workspace of its own with a $25 monthly limit; the Console has no day cap, the Seer's own is the one),
-nine real calls on Opus over two sittings, the DM's login and a player's, every answer from the live world and
+fifteen real calls on Opus over four sittings (the DM's login and two players', $1.38 by the Seer's tally), every
+answer from the live world and
 the cache as designed (the DM's first call wrote 90k tokens, each later one read it for about three cents; the
 player's first call read the DM's lore and party layers and wrote only his own 8k). Then, on the user's word,
 effort medium and instructions version 2 (the ball may make suggestions, grounded in the sections and marked
@@ -20,10 +21,11 @@ as its own), and the connect error's reason named (a refused `localhost` is an A
 message). The ball's user *Crystal Ball* (role Player) exists on the sandbox, made by `tools/ball-user.mjs`, its
 password in `seer/.env`; the module is deployed `--local`, enabled and registered there; the sandbox's Service
 URL setting is `http://localhost:30001/crystalball`; the Seer runs from a terminal there (`npm run seer:dev`;
-PowerShell wants `npm.cmd`), never as a service. Not released, not on GitHub, not on prod; `sync` is off in the
-suite's `repos.json` until the GitHub repo exists. Owed before a release: the `getPackages` name check, the
-GitHub repo, the Linux deploy on prod (never tested on Linux: the deploy guide and the unit are reviewed, not
-run). Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
+PowerShell wants `npm.cmd`), never as a service. The name is free (the setup screen's `getPackages`, 7,089
+modules, has no "Crystal Ball" and no `crystalball`); on GitHub since 2026-11-02 (`Txpple/fvtt-mod-crystalball`,
+`main` pushed, `sync` on in the suite's `repos.json`, every companion's family section carrying it); not
+released, not on prod. Owed before a release: the Linux deploy on prod (never tested on Linux: the deploy guide
+and the unit are reviewed, not run). Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
 
