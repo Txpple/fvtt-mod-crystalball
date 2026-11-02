@@ -409,20 +409,24 @@ const layer = (name, text) => ({ name, text, hash: sha256(text), estTokens: esti
  * @param {object} world     the `world` payload
  * @param {string} userId    the asker's Foundry user id
  * @param {ReturnType<import("./settings.js").moduleSettings>} settings
- * @param {{ budgetTokens?: number, warn?: (message: string, fields?: object) => void }} [options]
+ * @param {{ budgetTokens?: number, warn?: (message: string, fields?: object) => void,
+ *   books?: string[] }} [options]  `books`: the table's rulebooks, named in the instructions layer
  */
 export function buildGaze(
   world,
   userId,
   settings,
-  { budgetTokens = 120000, warn = () => {} } = {}
+  { budgetTokens = 120000, warn = () => {}, books = [] } = {}
 ) {
   const user = (world?.users ?? []).find(u => u._id === userId);
   if (!user) throw new Error("the user is not in the world");
   const gmGaze = settings?.gmGaze === "all" ? "all" : "player";
   const nameOf = uuidNamer(world);
 
-  const instructions = layer("instructions", instructionsLayer(settings?.tableNotes ?? ""));
+  const instructions = layer(
+    "instructions",
+    instructionsLayer(settings?.tableNotes ?? "", { books })
+  );
   const { lore, own: ownPages } = journalFor(world, user, { gmGaze, nameOf });
   const group = partyFor(world, user, { gmGaze });
   const party = partyText(world, group, { nameOf });

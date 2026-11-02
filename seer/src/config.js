@@ -54,6 +54,11 @@ export function loadConfig(configPath, defaultsPath = DEFAULTS_FILE) {
   if (!EFFORTS.includes(config.effort)) problems.push("effort");
   if (!["5m", "1h"].includes(config.cacheTtl)) problems.push("cacheTtl");
   if (!(config.maxOutputTokens > 0)) problems.push("maxOutputTokens");
+  // Lookups per answer: 0 rounds lets the model answer without them although the tools are given.
+  for (const k of ["lookupRounds", "lookupCalls"]) {
+    if (config[k] !== undefined && !(Number.isInteger(config[k]) && config[k] >= 0))
+      problems.push(k);
+  }
   // A count of 0 would refuse every message with no wait to name, so counts start at 1; a
   // dollar ceiling of 0 is a deliberate off switch and is allowed.
   for (const k of [

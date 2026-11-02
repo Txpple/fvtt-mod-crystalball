@@ -67,7 +67,8 @@ Body `{ "message": "<text>" }`. The reply is a Server-Sent Events stream (`Conte
 | event | data | notes |
 | --- | --- | --- |
 | `meta` | `{ "sittingId", "model", "gazeTokens": n, "layers": { "instructions": n, "lore": n, "party": n, "own": n } }` | first; token counts are the Seer's estimate (or `count_tokens` when a key is present) |
-| `delta` | `{ "text": "<piece>" }` | zero or more; the answer in order |
+| `delta` | `{ "text": "<piece>" }` | zero or more; the answer in order; a hop's words after an earlier hop's begin with a blank line (`"\n\n"`) |
+| `lookup` | `{ "action": "search", "query": "<words>" }` or `{ "action": "read", "name": "<entry>", "book": "<book>" }` | zero or more, between deltas; the ball is looking something up in the rulebooks; the window says so under the pending turn until the next delta (a window that knows no `lookup` ignores it) |
 | `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n, "day": n }, "stop": "<the model's stop reason>" }` | last on success; `stop` is the API's `stop_reason` (`end_turn` for the stub), and `max_tokens` means the answer ran into `config.maxOutputTokens`, which the window marks under the answer |
 | `error` | `{ "error": "<code as in the table above>", "message": "<short>", "reason"?: "<as the 503 body's>", "scope"?: "<as the 429 body's>", "retryAfter"?: <seconds> }` | last on failure after the stream opened; `reason` rides with `dark`, `scope` and `retryAfter` with `limit`, so the window words it as it would the status |
 
@@ -88,13 +89,16 @@ Scope `world`, namespace `fvtt-mod-crystalball`, registered by the module, read 
 | `askerIds` | string | `""` | comma-separated user ids when `askers` is `listed` |
 | `gmGaze` | `"player"` \| `"all"` | `"player"` | a GM's gaze: what every player sees plus the GM's own pages, or everything |
 | `modelLabel` | string | (unset) | reserved; the window shows what `healthz` reports |
+| `rulebooks` | string | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn's player packs (`scripts/decide/rulebooks.js`) | the compendium packs the ball may look things up in, one pack id a line (commas too); empty: no lookups |
+| `rulebookLeaveOut` | string | the stat-block and creature chapters, Arcana Unleashed's adventure, credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents |
 
 ## The gaze
 
 Built per user from the live `world` payload, in this order, deterministically (stable sorts by folder path,
 `sort`, then id; no timestamps, no counters, no ids in the text):
 
-1. **instructions**: the Seer's standing text (versioned in `seer/src/instructions.js`) + the DM's `tableNotes`.
+1. **instructions**: the Seer's standing text (versioned in `seer/src/instructions.js`), then, when the table has
+   rulebooks, a section naming its books and when to look things up, then the DM's `tableNotes`.
 2. **lore**: every journal page every player can observe (entry `ownership.default ≥ 2` and page `ownership.default`
    `≥ 2` or `-1` inheriting), text pages as Markdown (`@UUID[...]{Name}` → `Name`, `@UUID[...]` without a label →
    the document's name when it can be resolved from the payload, else dropped), image/video/pdf pages as a title
@@ -120,13 +124,45 @@ Layers 1–4 are the system prompt, four text blocks, each with `cache_control: 
 first three and top-level automatic caching for the rest (`config.cacheTtl` chooses `5m` or `1h`). The gaze is
 never written to disk.
 
+## The rulebooks
+
+When `rulebooks` names packs the world has (journal and item packs only; an actor, adventure, scene, table or
+effect pack is refused whatever the setting says), the model is given two tools, the same bytes for every player
+at the table (the books' names in them, never the asker's view), so they cache ahead of the instructions:
+
+- `search_rulebooks { query, kind? }`: up to 8 entries, the exact name first, then names, folders and text; every
+  term must match the start of a word somewhere; `kind` one of `spell`, `spell list`, `class`, `subclass`,
+  `feature`, `feat`, `species`, `background`, `equipment`, `facility`, `rules`. Each hit is a line: title,
+  hint, book, `id: <pack>/<document>[.<page>]`.
+- `read_rulebook { id }`: one entry as Markdown, at most 24,000 characters: a spell's facts and class lists, a
+  class's features by level, scale values and subclasses, a subclass's or species' granted features with their
+  text, a feature's granting class and level, a feat's prerequisites, an item's facts, a rules page with each
+  embedded journal page placed (two levels; an embedded actor, table or picture dropped), a spell list by level.
+
+The entries are an item pack's items of those kinds (never a monster's feature) and a journal pack's text, rule
+and class or subclass spell-list pages (class, subclass, image, map, video and pdf pages never). An entry whose
+name, entry or folder is in `rulebookLeaveOut` is neither found nor read.
+
+**Whose view**: Foundry 14.369 checks no read permission on a compendium get, so the Seer applies it: a pack's
+level for a user is the highest level of any role they hold in `core.compendiumConfiguration[<pack>].ownership`
+(a GM's row only), else the pack's own `ownership`, else `{ PLAYER: "OBSERVER", ASSISTANT: "OWNER" }`, as
+`getUserLevel` computes it; Observer reads. A GM reads at the Player role under `gmGaze` `player` and every
+configured pack under `all`. An embedded page's pack must pass the same test.
+
+**Loading**: a pack is read the first time a lookup needs it and held six hours (a world change or a pack whose
+index grows reads it again); a pack that fails is said in the search's answer and tried again on the next lookup.
+
 ## The model call
 
 `@anthropic-ai/sdk`, `client.messages.stream(...)`: `model` from config (`claude-opus-5-5` default,
 `claude-sonnet-5-5` the other), no `thinking` parameter (adaptive is the model's default), `output_config:
 { effort: config.effort }` (`medium` default), `max_tokens: config.maxOutputTokens` (4096), `betas:
 ["server-side-fallback-2026-07-01"]` with `fallbacks: "default"` through the beta client when
-`config.refusalFallback` is true (default true). The response `usage` fields `input_tokens`,
+`config.refusalFallback` is true (default true). With the rulebooks, `tools` as above; a reply that stops on
+`tool_use` has its calls run, and the next hop carries the assistant's content whole (thinking included) and a
+`tool_result` per call (`is_error` for a refused or failed one), up to `config.lookupRounds` (4) rounds and
+`config.lookupCalls` (8) calls, the hop after the last round sent with `tool_choice: { type: "none" }`. A hop the
+fallback model served goes on with that model. The stored answer is every hop's words joined by a blank line. The response `usage` fields `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens` make the ledger line, priced by
 `config.prices[model]` (per MTok: `input`, `cacheWrite5m`, `cacheWrite1h`, `cacheRead`, `output`).
 
@@ -145,7 +181,8 @@ cacheRead: 0, output: <estimate> }`, cost 0, model `"stub"`. The token estimate 
 
 `perUserHour: 10`, `perUserDay: 40`, `tableDayUsd: 5`, `tableMonthUsd: 25`, `messageChars: 4000`,
 `sittingTurns: 24`, `gazeBudgetTokens: 120000` (past it: the oldest lore pages by entry sort are replaced by their
-titles until under budget, and a warning is logged), `callTimeoutMs: 60000`. Counters are per Foundry user id,
+titles until under budget, and a warning is logged), `callTimeoutMs: 60000` (each hop of an answer),
+`lookupRounds: 4`, `lookupCalls: 8`. One message is one call against the caps, whatever its hops. Counters are per Foundry user id,
 rolling hour and calendar day (local time of the box); the table's day and month are calendar, from the ledger.
 
 ## Storage
@@ -153,7 +190,7 @@ rolling hour and calendar day (local time of the box); the table's day and month
 `DATA_DIR` (default `seer/data`), created `0700` where the platform allows: `sittings/<userId>/current.json`,
 `sittings/<userId>/<startedAt>.json` (closed; older than `sittingRetentionDays: 90` deleted at start and daily),
 `usage.jsonl` (one line per call: `{ at, userId, userName, model, usage, cost, gazeTokens, layers: { <hash per
-layer> }, latencyMs, stub, outcome: "done" | "aborted" | "failed", estimated?: true }`; a call is counted against
+layer> }, latencyMs, stub, outcome: "done" | "aborted" | "failed", estimated?: true, lookups?: n }`, usage and cost every hop's; a call is counted against
 the caps and the ledger the moment the model is asked, whatever its end, from the stream's last usage or, failing
 that, the gaze's estimate marked `estimated`). Writes are write-then-rename; the ledger is append plus fsync. The
 probe is asked on every request; only a refusal is remembered, for 30 seconds, in memory.
@@ -185,6 +222,10 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
   session has not joined the running world; the whole thing null when unknown).
 - **World**: `socket.emit("world", callback)` → the payload with `users`, `actors`, `items`, `journal`, `folders`,
   `settings`, `messages`, … (every document, unfiltered) plus `userId`.
+- **A pack's documents**: `socket.emit("modifyDocument", { type: "<JournalEntry | Item>", action: "get", operation:
+  { pack: "<id>", query: {} } }, callback)` → `{ result: [<source>…] }` (journal entries with their pages), or
+  `{ error: { message } }`. Never broadcast; no permission check (see *The rulebooks*). The world payload's
+  `packs` lists every active pack with its `ownership`, `index` and `folders`.
 - **Probe**: the same socket handshake with a *player's* session id, read `session`, disconnect. Side-effect free
   for a connected player (a user is deactivated only when their last socket drops).
 

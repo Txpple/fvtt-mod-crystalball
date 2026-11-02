@@ -1,7 +1,8 @@
 /**
  * What the Seer's tests share: the fixtures of the Foundry build the Seer is verified on, a
  * silent logger that keeps what it was told, and a fake socket.io that answers as Foundry 14.369
- * does (the `session` event on connect, acknowledgements for `getJoinData` and `world`).
+ * does (the `session` event on connect, acknowledgements for `getJoinData`, `world` and a
+ * pack's `modifyDocument` get).
  */
 
 import fs from "node:fs";
@@ -31,8 +32,8 @@ export const tempDir = prefix => fs.mkdtempSync(path.join(os.tmpdir(), `crystalb
 
 /**
  * A fake socket.io client. `behave(sessionId)` decides what Foundry says to a socket opened on a
- * cookie: `{ session, joinData, world }` (each a value, or a function of nothing), or
- * `{ connectError }`.
+ * cookie: `{ session, joinData, world }` (each a value, or a function of nothing), a
+ * `modifyDocument` function of the request, or `{ connectError }`.
  */
 export function fakeIo(behave) {
   const sockets = [];
@@ -51,6 +52,7 @@ export function fakeIo(behave) {
       connected: true,
       disconnected: false,
       emitted: [],
+      requests: [],
       on: (event, fn) => add(event, fn, false),
       once: (event, fn) => add(event, fn, true),
       off: (event, fn) =>
@@ -67,10 +69,18 @@ export function fakeIo(behave) {
         );
         for (const h of list) h.fn(...args);
       },
-      emit(event, ack) {
+      emit(event, ...args) {
+        const ack = args.pop();
         socket.emitted.push(event);
+        socket.requests.push({ event, args });
         const answer =
-          event === "getJoinData" ? plan.joinData : event === "world" ? plan.world : undefined;
+          event === "getJoinData"
+            ? plan.joinData
+            : event === "world"
+              ? plan.world
+              : event === "modifyDocument"
+                ? () => plan.modifyDocument?.(...args)
+                : undefined;
         // An answer that is (or whose function returns) undefined is never sent: a Foundry that
         // has stopped answering.
         const value = typeof answer === "function" ? answer() : answer;

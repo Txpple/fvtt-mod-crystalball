@@ -112,13 +112,25 @@ const LOOKUP = new RegExp(`\\[\\[\\s{0,20}lookup\\b${INNER}\\]\\]${LABEL}`, "gi"
 const COMMAND = new RegExp(`\\[\\[\\/(\\w{1,32})${INNER}\\]\\]${LABEL}`, "g");
 const INLINE_ROLL = new RegExp(`\\[\\[${INNER}\\]\\]${LABEL}`, "g");
 
+/** How deep embedded pages are followed: a page that embeds a page that embeds one. */
+const EMBED_DEPTH = 2;
+
 /**
  * Foundry's enricher syntax as plain words, on the stored HTML before conversion.
  * @param {string} html
  * @param {(uuid: string) => string | null} [nameOf]  resolves an unlabeled `@UUID[...]`
+ * @param {(uuid: string) => string | null} [embed]  the stored HTML an `@Embed[...]` places, or
+ *   null to drop it (the gaze passes none: a picture or a table it cannot give)
  */
-export function enrichToText(html, nameOf = () => null) {
+export function enrichToText(html, nameOf = () => null, embed = null) {
   let out = String(html ?? "");
+  // An embedded page's own HTML takes the embed's place before anything else is converted, so its
+  // links and rolls are enriched with the page around it.
+  for (let depth = 0; embed && depth < EMBED_DEPTH && EMBED.test(out); depth++) {
+    EMBED.lastIndex = 0;
+    out = out.replace(EMBED, (_m, inner) => embed(inner.trim().split(/\s+/)[0] ?? "") ?? "");
+  }
+  EMBED.lastIndex = 0;
   // @UUID[...]{Label} and the older @Actor[...]{Label}, @Compendium[...]{Label} and friends.
   out = out.replace(DOCUMENT_LINK, (_m, kind, target, label) => {
     if (label !== undefined) return label;
@@ -134,7 +146,9 @@ export function enrichToText(html, nameOf = () => null) {
   // HTML usually carries the ampersand encoded.
   out = out.replace(REFERENCE, (_m, inner, label) => {
     if (label !== undefined) return label;
-    const name = inner.split(/\s+/).find(t => !t.includes("=")) ?? "";
+    // The words before any `key=value` option: `Total Cover`, `Charmed apply=false`.
+    const tokens = inner.split(/\s+/).filter(Boolean);
+    const name = tokens.filter(t => !t.includes("=")).join(" ") || (tokens[0]?.split("=")[1] ?? "");
     const plain = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name;
     return plain ? plain.charAt(0).toUpperCase() + plain.slice(1) : "";
   });
@@ -230,12 +244,14 @@ function converter({ secrets, headingOffset }) {
 /**
  * Stored HTML as Markdown.
  * @param {string} html
- * @param {{ nameOf?: (uuid: string) => string | null, secrets?: boolean, headingOffset?: number }} [options]
+ * @param {{ nameOf?: (uuid: string) => string | null, embed?: (uuid: string) => string | null,
+ *   secrets?: boolean, headingOffset?: number }} [options]
+ *   `embed`: the HTML an `@Embed[...]` places (the rulebooks' pages that embed a glossary entry);
  *   `secrets`: keep `<section class="secret">` blocks (the reader is the document's owner);
  *   `headingOffset`: levels added to the page's own headings.
  */
-export function htmlToMarkdown(html, { nameOf, secrets = false, headingOffset = 0 } = {}) {
-  const source = enrichToText(html, nameOf);
+export function htmlToMarkdown(html, { nameOf, embed, secrets = false, headingOffset = 0 } = {}) {
+  const source = enrichToText(html, nameOf, embed);
   if (!source.trim()) return "";
   const md = converter({ secrets, headingOffset }).turndown(source);
   return md

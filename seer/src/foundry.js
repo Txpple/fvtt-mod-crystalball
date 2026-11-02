@@ -15,8 +15,14 @@
  *   whole thing null when the cookie is unknown). `world` answers the full payload, unfiltered.
  * - **The probe**: the same handshake with a player's session id, read `session`, disconnect.
  *
- * The Seer emits nothing else and writes nothing to Foundry. A session id is never logged: the
- * probe's short memo of refusals is keyed by its sha256.
+ * - **A pack's documents**: `modifyDocument` with `{ type, action: "get", operation: { pack,
+ *   query: {} } }`, as the client's own `getDocuments` asks; the acknowledgement's `result` holds
+ *   the documents' source, embedded pages included. Foundry checks no read permission on a get
+ *   (only create, update and delete), so the Seer applies the pack's ownership itself
+ *   (`rulebooks.js`) before anything read this way reaches a gaze.
+ *
+ * The Seer emits nothing else and writes nothing to Foundry: a get is never broadcast. A session id
+ * is never logged: the probe's short memo of refusals is keyed by its sha256.
  */
 
 import { createHash } from "node:crypto";
@@ -173,7 +179,7 @@ function nextEvent(socket, event, ms) {
 }
 
 /** An emit with an acknowledgement, or a rejection on a timeout. */
-function ask(socket, event, ms) {
+function ask(socket, event, ms, ...args) {
   return new Promise((resolve, reject) => {
     // A socket that drops (Foundry restarting) never answers: the ask fails at once, not at the
     // timeout, so a request waiting on it is told the ball is dark.
@@ -187,7 +193,7 @@ function ask(socket, event, ms) {
       else resolve(value);
     }
     socket.once("disconnect", onDrop);
-    socket.emit(event, value => done(null, value));
+    socket.emit(event, ...args, value => done(null, value));
   });
 }
 
@@ -433,6 +439,28 @@ export function createLink({
         });
       }
       return inflight;
+    },
+
+    /**
+     * Every document of one compendium pack, as its source (a journal entry with its pages, an
+     * item with its effects). Read on the ball's socket; throws when dark or when Foundry answers
+     * with an error (a pack that is not active, a type the pack does not hold).
+     * @param {string} pack  the pack's id, `<package>.<name>`
+     * @param {string} type  the pack's document type (`JournalEntry`, `Item`)
+     */
+    async packDocuments(pack, type) {
+      const s = socket;
+      if (!s) throw new Error("dark: the ball's socket is not connected");
+      const reply = await ask(s, "modifyDocument", 60000, {
+        type,
+        action: "get",
+        operation: { pack, query: {} }
+      });
+      if (reply?.error)
+        throw new Error(
+          `Foundry refused the read of ${pack}: ${reply.error.message ?? "no reason"}`
+        );
+      return Array.isArray(reply?.result) ? reply.result : [];
     },
 
     /**

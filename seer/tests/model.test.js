@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   cacheMarker,
   costOf,
@@ -391,7 +391,8 @@ describe("what an unfinished call spent", () => {
       usage: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
       cost: 0,
       model: "claude-opus-5-5",
-      estimated: false
+      estimated: false,
+      lookups: 0
     });
   });
 
@@ -470,4 +471,194 @@ describe("count_tokens", () => {
       await createModel({ config: CONFIG, log: quietLog(), client: slow }).countGaze(layers)
     ).toBe(12);
   });
+});
+
+describe("an answer that looks things up", () => {
+  const USAGE = {
+    input_tokens: 100,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 1000,
+    output_tokens: 40
+  };
+  const toolUse = (id, name, input) => ({ type: "tool_use", id, name, input });
+
+  /** A client whose hops answer in turn: each `{ text, uses, stop, fail }`. */
+  function hopsClient(hops) {
+    const calls = [];
+    const stream = (kind, params, options) => {
+      const n = calls.length;
+      calls.push({ kind, params: structuredClone(params), options });
+      const hop = hops[Math.min(n, hops.length - 1)];
+      const handlers = {};
+      return {
+        currentMessage: undefined,
+        on(event, fn) {
+          handlers[event] = fn;
+          return this;
+        },
+        async finalMessage() {
+          if (hop.fail) throw hop.fail;
+          if (hop.text) handlers.text?.(hop.text, "");
+          return {
+            model: hop.model ?? "claude-opus-5-5",
+            stop_reason: hop.stop ?? (hop.uses?.length ? "tool_use" : "end_turn"),
+            content: [
+              { type: "thinking", thinking: "", signature: `sig${n}` },
+              ...(hop.text ? [{ type: "text", text: hop.text }] : []),
+              ...(hop.uses ?? [])
+            ],
+            usage: USAGE
+          };
+        }
+      };
+    };
+    return {
+      calls,
+      messages: {
+        stream: (p, o) => stream("plain", p, o),
+        countTokens: async () => ({ input_tokens: 1 })
+      },
+      beta: { messages: { stream: (p, o) => stream("beta", p, o) } }
+    };
+  }
+
+  const DEFS = [{ name: "search_rulebooks", description: "d", input_schema: { type: "object" } }];
+
+  it("runs the tool calls, hands back their results and answers, every hop counted", async () => {
+    const client = hopsClient([
+      { text: "Let me look.", uses: [toolUse("t1", "search_rulebooks", { query: "fireball" })] },
+      { text: "Fireball is level 3." }
+    ]);
+    const run = vi.fn(async () => ({ content: "Fireball (level 3 evocation)", isError: false }));
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const deltas = [];
+    const result = await model.answer({
+      layers,
+      messages,
+      meta: {},
+      message: "x",
+      onDelta: d => deltas.push(d),
+      tools: { definitions: DEFS, run }
+    });
+    expect(run).toHaveBeenCalledWith(toolUse("t1", "search_rulebooks", { query: "fireball" }));
+    expect(client.calls).toHaveLength(2);
+    expect(client.calls[0].params.tools).toEqual(DEFS);
+    expect(client.calls[0].params.tool_choice).toBeUndefined();
+    const second = client.calls[1].params.messages;
+    expect(second.slice(0, messages.length)).toEqual(messages);
+    // The assistant's turn goes back whole, its thinking included, then the results.
+    expect(second.at(-2).content[0]).toEqual({ type: "thinking", thinking: "", signature: "sig0" });
+    expect(second.at(-1)).toEqual({
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "t1", content: "Fireball (level 3 evocation)" }]
+    });
+    expect(deltas.join("")).toBe("Let me look.\n\nFireball is level 3.");
+    expect(result.text).toBe("Let me look.\n\nFireball is level 3.");
+    expect(result.usage).toEqual({ input: 200, cacheWrite: 0, cacheRead: 2000, output: 80 });
+    expect(result.cost).toBeCloseTo(
+      2 * costOf(usageOf(USAGE), USAGE, CONFIG.prices["claude-opus-5-5"], "5m")
+    );
+    expect(result.lookups).toBe(1);
+    expect(result.stopReason).toBe("end_turn");
+  });
+
+  it("lets the last round only answer, and caps the lookups", async () => {
+    const many = Array.from({ length: 5 }, (_, i) =>
+      toolUse(`t${i}`, "search_rulebooks", { query: `q${i}` })
+    );
+    const client = hopsClient([{ uses: many }, { uses: many }, { text: "Done." }]);
+    const run = vi.fn(async () => ({ content: "hit" }));
+    const config = { ...CONFIG, lookupRounds: 2, lookupCalls: 8 };
+    const model = createModel({ config, log: quietLog(), client });
+    const result = await call2(model, { definitions: DEFS, run });
+    expect(client.calls.map(c => c.params.tool_choice?.type ?? "auto")).toEqual([
+      "auto",
+      "auto",
+      "none"
+    ]);
+    expect(run).toHaveBeenCalledTimes(8);
+    const results = client.calls[2].params.messages.at(-1).content;
+    expect(results.slice(-2).every(r => r.is_error === true)).toBe(true);
+    expect(result.lookups).toBe(10);
+    expect(result.text).toBe("Done.");
+  });
+
+  it("gives a failed lookup back to the model as an error result, and goes on", async () => {
+    const client = hopsClient([
+      { uses: [toolUse("t1", "read_rulebook", { id: "x" })] },
+      { text: "Sorry." }
+    ]);
+    const log = quietLog();
+    const model = createModel({ config: CONFIG, log, client });
+    const result = await call2(model, {
+      definitions: DEFS,
+      run: async () => Promise.reject(new Error("socket"))
+    });
+    expect(client.calls[1].params.messages.at(-1).content[0]).toMatchObject({ is_error: true });
+    expect(result.text).toBe("Sorry.");
+    expect(log.lines.some(l => l.message === "rulebooks: a lookup failed")).toBe(true);
+  });
+
+  it("counts the hops before a failed one in what the failure spent", async () => {
+    const client = hopsClient([
+      { uses: [toolUse("t1", "search_rulebooks", { query: "a" })] },
+      { fail: Object.assign(new Error("overloaded"), { status: 529 }) }
+    ]);
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const err = await call2(model, {
+      definitions: DEFS,
+      run: async () => ({ content: "hit" })
+    }).catch(e => e);
+    expect(err.spend.usage).toEqual(usageOf(USAGE));
+    expect(err.spend.cost).toBeCloseTo(
+      costOf(usageOf(USAGE), USAGE, CONFIG.prices["claude-opus-5-5"], "5m")
+    );
+    expect(err.spend.lookups).toBe(1);
+  });
+
+  it("stops when the asker leaves during a lookup, counting only the hops that ran", async () => {
+    const controller = new AbortController();
+    const client = hopsClient([
+      { uses: [toolUse("t1", "search_rulebooks", { query: "a" })] },
+      { text: "never" }
+    ]);
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const run = async () => {
+      controller.abort(new Error("the client left"));
+      return { content: "hit" };
+    };
+    const err = await call2(model, { definitions: DEFS, run }, controller.signal).catch(e => e);
+    expect(err.message).toBe("the client left");
+    expect(client.calls).toHaveLength(1);
+    expect(err.spend.usage).toEqual(usageOf(USAGE));
+    expect(err.spend.estimated).toBe(false);
+  });
+
+  it("sends no tools and no tool choice when the table has no rulebooks", async () => {
+    const client = hopsClient([{ text: "Hi." }]);
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    await call2(model, null);
+    expect("tools" in client.calls[0].params).toBe(false);
+    expect("tool_choice" in client.calls[0].params).toBe(false);
+  });
+
+  it("puts the tools in the request only when given", () => {
+    expect(requestParams(CONFIG, layers, messages, { tools: DEFS, final: true })).toMatchObject({
+      tools: DEFS,
+      tool_choice: { type: "none" }
+    });
+    expect("tools" in requestParams(CONFIG, layers, messages)).toBe(false);
+  });
+
+  function call2(model, tools, signal) {
+    return model.answer({
+      layers,
+      messages,
+      meta: {},
+      message: "x",
+      onDelta: () => {},
+      tools,
+      signal
+    });
+  }
 });

@@ -38,6 +38,13 @@ prod (17/17 served files byte-identical), the box's Seer at `v1.0.1` by the guid
 mirror reset it. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
+**The rulebooks, built on `main`, uncommitted and unreleased**: the ball looks up the Player's Handbook, Arcana
+Unleashed and Heroes of Faerûn through two tools (`rulebooks.js`, the contract's *The rulebooks*), instructions
+version 3; `npm run verify` green; exercised against copies of the three books' packs (and dnd5e's `content24`,
+which the Handbook's glossary embeds) read off disk, never through the sandbox, which was busy. Not
+yet run: the socket's pack get against a live Foundry, a real model call with the tools, the window's lookup line
+in a browser. Measured on the copies: a search answers in about 250 to 380 tokens, a read in 40 to 1,100 (a long
+Heroes of Faerûn region page about 3,800); the tool definitions add about 350 tokens to the cached prefix.
 
 ## The rules this module keeps
 
@@ -54,7 +61,7 @@ the four backstories are player-observable); a 1,400-token answer takes about si
 - **The ball's user is a Player, never a GM.** Foundry sends every document to every connected user whatever its
   role, so the role buys no reading; a GM-level socket that runs no modules would be elected the table's active GM
   while the DM is away and By the Books' consequences would land on it and die. The Seer writes nothing to
-  Foundry: its socket emits `world` and nothing else.
+  Foundry: its socket emits `world` and, for the rulebooks, a pack's `modifyDocument` get, nothing else.
 - **The join, as 14.369 has it** (read from the build): the ball's user id comes from `getJoinData` on a socket
   holding the fresh cookie a plain GET of `/join` hands out (the page lists no users; a GET of `/join` with a
   session cookie logs that session out, so the Seer never sends one); `POST /join` names Foundry's own `Origin`
@@ -70,6 +77,15 @@ the four backstories are player-observable); a 1,400-token answer takes about si
   (instructions and the DM's table notes; the lore every player can observe; the party with its stash and Clue
   Board record; the player's own pages and curated sheets), the permission rule mirroring `testUserPermission` at
   OBSERVER, each layer a cached system block so a party shares the first three. The gaze is never written to disk.
+- **The rulebooks are looked up, never put in the gaze** (`seer/src/rulebooks.js`): the packs the *Rulebooks*
+  setting names (journal and item packs only, never a bestiary; an embedded stat block dropped, the creature
+  chapters and the adventure in *Left out of the rulebooks*), read off the ball's socket on first need and held,
+  searched and read through two tools the model calls (`search_rulebooks`, `read_rulebook`), at most four rounds
+  and eight calls an answer, the last hop answering only. Foundry checks no read permission on a compendium get,
+  so the Seer applies the pack's ownership as `getUserLevel` does, per asker. The tool definitions are the same
+  bytes for the whole table (they cache ahead of the instructions). The settings' defaults live in
+  `scripts/decide/rulebooks.js` and `seer/src/settings.js`, held equal by a test. No book text in a fixture:
+  the books are licensed, the tests' packs synthetic.
 - **Clue Board is read, never required** (`flags["fvtt-mod-clueboard"]` on the Group actor, schema 2, joined to
   the world Clue items); Card Catalogue's body class paints the button; nothing else is detected. No hook emitted,
   none listened to.
@@ -94,14 +110,14 @@ the four backstories are player-observable); a 1,400-token answer takes about si
 - `scripts/window.js`: `CrystalBallWindow` (ApplicationV2 + Handlebars, one per client): the status bar, the
   transcript, the input, the stream.
 - `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `saying.js` (the opening
-  saying from lang/en.json's lists), `session.js` (the session id,
+  saying from lang/en.json's lists), `rulebooks.js` (the rulebook settings' defaults, the lookup line), `session.js` (the session id,
   the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
 - `scripts/common.js`, `scripts/kit/`.
 - `seer/src/`: `main.js` (the entry: the Node 24 check, the process-level handlers, always runs), `config.js`
   (the environment and the config file, BOM-tolerant, `DATA_DIR` from systemd's `STATE_DIRECTORY` when set),
-  `start.js`, `foundry.js` (join, the ball's socket, the probe, the world), `settings.js` (the module's
-  world settings off the payload, user-scoped rows ignored, the module's active check), `permission.js`,
-  `gaze.js`, `markdown.js` (the enrichers and turndown), `labels.js` (dnd5e's key-to-label maps), `sheet.js`,
+  `start.js`, `foundry.js` (join, the ball's socket, the probe, the world, a pack's documents), `settings.js`
+  (the module's world settings off the payload, user-scoped rows ignored, the module's active check),
+  `permission.js`, `gaze.js`, `rulebooks.js` (the packs, their permission, the search, the reads, the library), `markdown.js` (the enrichers and turndown), `labels.js` (dnd5e's key-to-label maps), `sheet.js`,
   `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (versioned), `log.js`;
   `seer/config.json` the defaults; `seer/tests/` with synthetic fixtures under `fixtures/<foundry version>/`;
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.

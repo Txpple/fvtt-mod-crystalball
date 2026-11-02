@@ -13,6 +13,7 @@
  */
 
 import { log, MODULE_ID, setting, t } from "./common.js";
+import { DEFAULT_LEAVE_OUT, DEFAULT_RULEBOOKS } from "./decide/rulebooks.js";
 import { DEFAULT_SERVICE_URL } from "./decide/session.js";
 import { CrystalBallWindow } from "./window.js";
 
@@ -94,6 +95,21 @@ Hooks.once("init", () => {
     },
     default: "player"
   });
+
+  // The packs the ball may look rules up in, one id a line, and what it never reads in them.
+  for (const [name, initial] of [
+    ["rulebooks", DEFAULT_RULEBOOKS],
+    ["rulebookLeaveOut", DEFAULT_LEAVE_OUT]
+  ]) {
+    game.settings.register(MODULE_ID, name, {
+      ...key(name),
+      scope: "world",
+      config: true,
+      type: new fields.StringField({ required: true, blank: true, initial }),
+      default: initial,
+      ...(textarea ? { input: (_field, config) => textarea({ ...config, rows: 6 }) } : {})
+    });
+  }
 });
 
 /* -------------------------------------------------- */

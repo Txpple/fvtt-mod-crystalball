@@ -27,10 +27,20 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
   a player's by default, so the DM sees what the players get. **Ownership decides the lore**: a journal entry or
   page players can observe is what the ball knows, so the DM chooses what it reads by setting ownership, as for
   the players themselves.
+- **The rulebooks.** The ball can look up classes, subclasses and their features, species, backgrounds, feats,
+  spells and the class spell lists, equipment and the rules chapters in the compendium packs the DM names in the
+  *Rulebooks* setting (by default the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn, when the world
+  has them). It searches and reads them only when a question needs it, says which book an answer comes from, and
+  the window shows *the ball leafs through the rulebooks* while it looks. Only journal and item packs are read,
+  never a bestiary: no monster and no stat block reaches it, and *Left out of the rulebooks* removes the creature
+  chapters, an adventure, or anything else by folder, entry or page name. Each player reads only the packs
+  Foundry opens to them.
 - **Who is asking.** The window sends the player's own Foundry session with every request, and the Seer asks
   Foundry whose it is. A stranger on the internet has no session; a player cannot pretend to be another.
 - **What it costs.** The gaze is cached in layers shared across the party, so a sitting's later messages cost a
-  fraction of its first. The Seer caps messages per player per hour and per day, and the table's spend per day
+  fraction of its first. The rulebooks are never part of the gaze: a question that looks something up pays for
+  the lookup (a few hundred tokens an entry) and one more round with the model, a question that does not pays
+  nothing more. The Seer caps messages per player per hour and per day, and the table's spend per day
   and per month; past a cap the ball says so and goes quiet until the window turns.
 - **When it is dark.** With the Seer unreachable, the world closed or the model refusing, the window says *the
   ball is dark* and why, and offers a retry. The module installs and enables alone; without a Seer it does nothing
@@ -62,6 +72,8 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | Who may ask | every player | Every user, or only the listed user ids. |
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |
 | The GM's gaze | a player's | What a GM's sitting knows: what every player sees plus the GM's own pages, or everything in the world. |
+| Rulebooks | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn packs | The compendium packs the ball may look rules up in, one pack id a line. Journal and item packs only; empty, it looks nothing up. |
+| Left out of the rulebooks | the creature stat blocks and chapters, Arcana Unleashed's adventure, credits, change logs | Folders, journal entries and pages it never reads in those packs, one name a line. |
 
 ## Repository layout
 
@@ -71,7 +83,8 @@ scripts/
   crystalball.js               the entry point: settings, the button, the probe, the API
   window.js                    the Crystal Ball window
   common.js                    the id, the logger, the strings, the settings
-  decide/                      pure rules, no Foundry: sse.js, markdown.js, session.js
+  decide/                      pure rules, no Foundry: sse.js, markdown.js, session.js,
+                               saying.js, rulebooks.js (the settings' defaults, the lookup line)
   kit/                         the Open Roll 5e kit: elect.js, receipt.js, log.js, the same
                                bytes in every module that holds it (the suite keeps them)
 styles/, templates/, lang/     the look, the window's template, every word a player reads

@@ -144,6 +144,7 @@ export function createServer({
   config,
   version,
   log,
+  library = null,
   now = () => new Date(),
   heartbeatMs = HEARTBEAT_MS,
   logEnabled = () => false
@@ -223,9 +224,13 @@ export function createServer({
     let sse = null;
     let doneSent = false;
     try {
+      // The table's rulebooks, when it opens any: named in the instructions, read through the
+      // model's tools under the asker's view of each pack.
+      const desk = library?.desk(world, user, settings) ?? null;
       const gaze = buildGaze(world, user._id, settings, {
         budgetTokens: config.limits.gazeBudgetTokens,
-        warn: (m, f) => log.warn(m, f)
+        warn: (m, f) => log.warn(m, f),
+        books: desk?.books ?? []
       });
       const sitting = sittings.current(user._id, { model: model.id });
       const messages = [
@@ -273,6 +278,7 @@ export function createServer({
             latencyMs: Date.now() - t0,
             stub: Boolean(model.stub),
             outcome,
+            ...(spend.lookups ? { lookups: spend.lookups } : {}),
             ...(spend.estimated ? { estimated: true } : {})
           });
         } catch (err) {
@@ -293,7 +299,13 @@ export function createServer({
           meta: gaze.meta,
           message,
           signal: controller.signal,
-          onDelta: text => sse.send("delta", { text })
+          onDelta: text => sse.send("delta", { text }),
+          tools: desk
+            ? {
+                definitions: desk.definitions,
+                run: block => desk.run(block, look => sse.send("lookup", look))
+              }
+            : null
         });
       } catch (err) {
         const spend = err?.spend ?? {
@@ -327,7 +339,8 @@ export function createServer({
           usage: result.usage,
           cost: result.cost,
           latencyMs: Date.now() - t0,
-          stop: result.stopReason
+          stop: result.stopReason,
+          lookups: result.lookups ?? 0
         });
       }
       // The contract: a turn is stored only when `done` is sent; a client that left gets neither.

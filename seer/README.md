@@ -23,12 +23,19 @@ The contract between the window and the Seer, every endpoint, header, event, err
    party (members, stash, Clue Board record); the pages only this user observes and each character they own as a
    curated sheet. Each layer is a cached system block, so a party shares the first three. The gaze is never
    written to disk.
-5. Streams the model's answer as Server-Sent Events, then appends a line to the usage ledger and the turn to the
+5. Gives the model the table's **rulebooks** as two tools when the *Rulebooks* setting names packs the world has
+   (`rulebooks.js`): `search_rulebooks` and `read_rulebook`. A pack is read off the ball's socket the first time
+   a lookup needs it (a `modifyDocument` get, as Foundry's own client asks) and held six hours; each player
+   reads only the packs Foundry would open to them, which the Seer works out itself, since Foundry checks no read
+   permission on a get. Journal and item packs only, never a bestiary; an embedded stat block is dropped and an
+   embedded glossary page is placed. Every lookup goes out as a `lookup` event.
+6. Streams the model's answer as Server-Sent Events, then appends a line to the usage ledger and the turn to the
    user's sitting. A call that fails or is abandoned after the model was asked still gets its ledger line and
    counts against the caps, priced from the stream's last usage or, failing that, estimated; only a finished
    answer becomes a turn.
 
-The ball's user socket emits nothing but `world`; the Seer writes nothing to Foundry.
+The ball's user socket emits `world` and, for the rulebooks, a pack's `modifyDocument` get; the Seer writes
+nothing to Foundry.
 
 ## Running it on a sandbox
 
@@ -51,11 +58,15 @@ sentence, which names what the gaze holds, so a live check can assert on it for 
 ## The model call
 
 `claude-opus-5-5` by default (`claude-sonnet-5-5` the other choice in `config.json`), `output_config.effort` medium,
-2,048 output tokens, no `thinking` parameter, streamed. The four layers are the system prompt: an explicit
+4,096 output tokens, no `thinking` parameter, streamed. The four layers are the system prompt: an explicit
 `cache_control` marker on the first three and the request's top-level automatic marker for the conversation, so a
 sitting's next message reads the cached gaze and history. With `refusalFallback` on, the call goes through the
 beta client with `fallbacks: "default"`, so a request the model declines on policy grounds is answered by the API's
-fallback model in the same call. Prices per million tokens are in `config.json` and make the ledger's cost.
+fallback model in the same call. With the rulebooks the tools ride ahead of the first system block (the same
+bytes for the whole table, so they cache with the instructions); a round of tool calls is run and its results go
+back, at most `lookupRounds` rounds and `lookupCalls` calls an answer, the last hop answering only. Each hop has
+`callTimeoutMs` of its own, and the usage and cost are every hop's. Prices per million tokens are in
+`config.json` and make the ledger's cost.
 
 ## Configuration
 

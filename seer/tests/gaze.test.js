@@ -10,10 +10,10 @@ const CY = "playerCy00000001";
 const GM = "gmUser0000000001";
 const AIDE = "assistGm00000001";
 
-const gazeOf = (userId, { w = world(), gmGaze, budgetTokens, warn } = {}) => {
+const gazeOf = (userId, { w = world(), gmGaze, budgetTokens, warn, books } = {}) => {
   const settings = moduleSettings(w);
   if (gmGaze) settings.gmGaze = gmGaze;
-  return buildGaze(w, userId, settings, { budgetTokens, warn });
+  return buildGaze(w, userId, settings, { budgetTokens, warn, books });
 };
 const text = (gaze, name) => gaze.layers.find(l => l.name === name).text;
 
@@ -48,6 +48,21 @@ describe("the layers", () => {
     expect(t.startsWith(INSTRUCTIONS)).toBe(true);
     expect(t).toContain("## The Dungeon Master's notes for this table");
     expect(t.endsWith("Speak like an old sage.")).toBe(true);
+  });
+
+  it("name the table's rulebooks between the standing text and the DM's notes, when it has any", () => {
+    const without = text(gazeOf(ADA), "instructions");
+    expect(without).not.toContain("## The table's rulebooks");
+    const t = text(gazeOf(ADA, { books: ["Book One", "Book Two"] }), "instructions");
+    expect(t.startsWith(`${INSTRUCTIONS}\n\n## The table's rulebooks`)).toBe(true);
+    expect(t).toContain("this table plays from: Book One; Book Two.");
+    expect(t.indexOf("## The table's rulebooks")).toBeLessThan(
+      t.indexOf("## The Dungeon Master's notes")
+    );
+    expect(t.endsWith("Speak like an old sage.")).toBe(true);
+    // The other layers never change with the books.
+    for (const name of ["lore", "party", "own"])
+      expect(text(gazeOf(ADA, { books: ["Book One"] }), name)).toBe(text(gazeOf(ADA), name));
   });
 
   it("estimate four characters a token", () => {

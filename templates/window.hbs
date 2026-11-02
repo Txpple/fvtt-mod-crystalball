@@ -26,6 +26,7 @@
         {{else}}
         <div class="crystalball-text">{{{ html }}}</div>
         {{/if}}
+        {{#if pending}}<p class="crystalball-looking">{{ looking }}</p>{{/if}}
         {{#if note}}<p class="crystalball-note">{{ note }}</p>{{/if}}
         {{#if error}}<p class="crystalball-error">{{ error }}</p>{{/if}}
     </article>

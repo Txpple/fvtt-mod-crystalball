@@ -61,6 +61,33 @@ describe("the other enrichers", () => {
     expect(enrichToText("&Reference[condition=prone]{Prone}")).toBe("Prone");
     expect(enrichToText("x @Embed[JournalEntry.abc inline] y")).toBe("x  y");
   });
+
+  it("names a reference of several words whole", () => {
+    expect(
+      enrichToText(
+        "behind &amp;Reference[Total Cover] and &Reference[Heavily Obscured apply=false]"
+      )
+    ).toBe("behind Total Cover and Heavily Obscured");
+  });
+
+  it("places an embed's own HTML when a resolver gives it, two levels deep, and drops the rest", () => {
+    const pages = {
+      "Compendium.a.b.JournalEntry.e.JournalEntryPage.p1":
+        "<p>One @Embed[Compendium.a.b.JournalEntry.e.JournalEntryPage.p2 inline]</p>",
+      "Compendium.a.b.JournalEntry.e.JournalEntryPage.p2":
+        "two &Reference[Prone] @Embed[Compendium.a.b.JournalEntry.e.JournalEntryPage.p3]",
+      "Compendium.a.b.JournalEntry.e.JournalEntryPage.p3": "three"
+    };
+    const embed = uuid => pages[uuid] ?? null;
+    expect(
+      htmlToMarkdown("<p>@Embed[Compendium.a.b.JournalEntry.e.JournalEntryPage.p1 inline]</p>", {
+        embed
+      })
+    ).toBe("One two Prone");
+    expect(htmlToMarkdown("<p>a @Embed[Compendium.x.y.Actor.z statblock] b</p>", { embed })).toBe(
+      "a b"
+    );
+  });
 });
 
 describe("htmlToMarkdown", () => {

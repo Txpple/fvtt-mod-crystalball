@@ -33,7 +33,7 @@ afterEach(() => {
   }
 });
 
-async function start({ w = world(), limits: caps = {}, model, probe, worldFn } = {}) {
+async function start({ w = world(), limits: caps = {}, model, probe, worldFn, library } = {}) {
   const dir = tempDir("http");
   const log = quietLog();
   const state = { connected: true, worldOpen: true, world: "test-world", ballUser: "Crystal Ball" };
@@ -61,7 +61,8 @@ async function start({ w = world(), limits: caps = {}, model, probe, worldFn } =
     sittings,
     config,
     version: "9.9.9",
-    log
+    log,
+    library
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   running.push({ server, dir });
@@ -418,6 +419,71 @@ describe("POST chat", () => {
       hour: 1,
       day: 1
     });
+  });
+
+  it("hands the model the table's rulebooks, streams each lookup and counts them in the ledger", async () => {
+    const seen = {};
+    const library = {
+      desk: (_world, user, settings) => {
+        seen.desk = { user: user._id, leave: settings.rulebookLeaveOut.length };
+        return {
+          books: ["Book One"],
+          definitions: [{ name: "search_rulebooks" }],
+          open: 1,
+          run: async (block, onLookup) => {
+            onLookup({ action: "read", name: "Fireball", book: "Book One" });
+            return { content: `read ${block.input.id}` };
+          }
+        };
+      }
+    };
+    const model = {
+      id: "claude-opus-5-5",
+      stub: false,
+      countGaze: async () => 1,
+      answer: async ({ tools, layers, onDelta }) => {
+        seen.definitions = tools.definitions;
+        seen.instructions = layers[0].text;
+        seen.result = await tools.run({ name: "read_rulebook", input: { id: "b/f" } });
+        onDelta("Level 3.");
+        return {
+          text: "Level 3.",
+          usage: { input: 1, cacheWrite: 0, cacheRead: 0, output: 1 },
+          cost: 0.001,
+          model: "claude-opus-5-5",
+          stopReason: "end_turn",
+          lookups: 1
+        };
+      }
+    };
+    const s = await start({ model, library });
+    const evs = events((await chat(s.port, "What does Fireball do?")).text);
+    expect(evs.map(e => e.event)).toEqual(["meta", "lookup", "delta", "done"]);
+    expect(evs[1].data).toEqual({ action: "read", name: "Fireball", book: "Book One" });
+    expect(seen.desk.user).toBe("playerAda0000001");
+    expect(seen.definitions).toEqual([{ name: "search_rulebooks" }]);
+    expect(seen.instructions).toContain("this table plays from: Book One.");
+    expect(seen.result).toEqual({ content: "read b/f" });
+    expect(s.ledger.read()[0]).toMatchObject({ outcome: "done", lookups: 1 });
+  });
+
+  it("gives the model no tools and the ledger no lookups when the table has no rulebooks", async () => {
+    let given = "unset";
+    const base = createModel({ config: CONFIG, log: quietLog() });
+    const model = {
+      ...base,
+      id: "stub",
+      stub: true,
+      countGaze: base.countGaze,
+      answer: args => {
+        given = args.tools;
+        return base.answer(args);
+      }
+    };
+    const s = await start({ model, library: { desk: () => null } });
+    await chat(s.port, "hi");
+    expect(given).toBeNull();
+    expect("lookups" in s.ledger.read()[0]).toBe(false);
   });
 
   it("aborts the model call when the client leaves, counts what it spent, and keeps no turn", async () => {

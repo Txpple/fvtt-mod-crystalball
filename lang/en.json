@@ -23,6 +23,14 @@
         "name": "Listed users",
         "hint": "When Who may ask is set to the listed users: their user ids, separated by commas."
       },
+      "rulebooks": {
+        "name": "Rulebooks",
+        "hint": "The compendium packs the ball may look rules up in, one pack id a line (the Player's Handbook's spells are dnd-players-handbook.spells). Journal and item packs only, never monsters; each player reads only the packs open to them. Leave it empty and the ball looks nothing up."
+      },
+      "rulebookLeaveOut": {
+        "name": "Left out of the rulebooks",
+        "hint": "Folders, journal entries and pages the ball never reads in those packs, one name a line: the creatures, an adventure, anything you keep for yourself."
+      },
       "gmGaze": {
         "name": "The GM's gaze",
         "hint": "What the ball knows when a GM asks: what the players can see plus the GM's own pages (so you test what your players get), or everything in the world.",
@@ -77,6 +85,11 @@
       ]
     },
     "long": "The vision faded before the end; ask the ball to go on.",
+    "lookup": {
+      "search": "The ball leafs through the rulebooks…",
+      "read": "The ball turns to {name} in {book}…",
+      "readAny": "The ball turns to {name}…"
+    },
     "status": {
       "loading": "Gazing…",
       "dark": "Dark",

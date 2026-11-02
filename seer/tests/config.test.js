@@ -26,6 +26,8 @@ describe("the committed config", () => {
       cacheTtl: "5m",
       refusalFallback: true,
       callTimeoutMs: 60000,
+      lookupRounds: 4,
+      lookupCalls: 8,
       sittingRetentionDays: 90,
       limits: {
         perUserHour: 10,
@@ -133,7 +135,12 @@ describe("the environment", () => {
 
 describe("the module's settings", () => {
   it("are the contract's defaults when the world never saved them", () => {
-    expect(moduleSettings({ settings: [] })).toEqual({ ...SETTING_DEFAULTS, askerIds: [] });
+    expect(moduleSettings({ settings: [] })).toEqual({
+      ...SETTING_DEFAULTS,
+      askerIds: [],
+      rulebooks: SETTING_DEFAULTS.rulebooks.split("\n"),
+      rulebookLeaveOut: SETTING_DEFAULTS.rulebookLeaveOut.split("\n")
+    });
     expect(SETTING_DEFAULTS).toMatchObject({
       enabled: true,
       serviceUrl: "/crystalball",

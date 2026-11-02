@@ -13,6 +13,7 @@
 
 import { log, MODULE_ID, setting, t } from "./common.js";
 import { renderMarkdown } from "./decide/markdown.js";
+import { lookupLine } from "./decide/rulebooks.js";
 import { composeSaying } from "./decide/saying.js";
 import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceBase, sessionIdFrom, waitOf } from "./decide/session.js";
 import { createSseParser } from "./decide/sse.js";
@@ -22,8 +23,11 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 /** A JSON call that has not answered by then never will: the window goes dark instead of hanging. */
 const CALL_TIMEOUT_MS = 15_000;
 
-/** The Seer gives the model a minute; this only ends a stream that never closes. */
-const CHAT_TIMEOUT_MS = 120_000;
+/**
+ * The Seer gives the model a minute a hop, and an answer that looks rules up takes a hop per round
+ * of lookups; this only ends a stream that never closes.
+ */
+const CHAT_TIMEOUT_MS = 240_000;
 
 /** How often a streaming answer is redrawn: smooth enough, and cheap on a long answer. */
 const PAINT_MS = 50;
@@ -214,6 +218,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
         html: turn.role === "ball" ? renderMarkdown(turn.text) : "",
         error: turn.error ?? "",
         note: turn.note ?? "",
+        looking: turn.pending ? (turn.looking ?? "") : "",
         pending: !!turn.pending
       })),
       draft: this.#draft,
@@ -420,7 +425,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     if (!this.#canSend()) return;
     const text = this.#draft.trim();
     const gen = this.#gen;
-    const ball = { role: "ball", text: "", pending: true, error: "", note: "" };
+    const ball = { role: "ball", text: "", pending: true, error: "", note: "", looking: "" };
     this.#turns.push({ role: "user", text }, ball);
     this.#draft = "";
     this.#busy = true;
@@ -494,6 +499,12 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
           this.#model = modelLabel(data?.model) ?? this.#model;
         } else if (event === "delta") {
           ball.text += typeof data?.text === "string" ? data.text : "";
+          ball.looking = "";
+          this.#paintSoon();
+        } else if (event === "lookup") {
+          // The ball is reading the rulebooks: said under its turn until its next words come.
+          const line = lookupLine(data);
+          if (line) ball.looking = t(line.key, line.data);
           this.#paintSoon();
         } else if (event === "done") {
           if (typeof data?.text === "string") ball.text = data.text;
@@ -523,6 +534,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       if (!ball || !el) return;
       const stick = this.#atBottom();
       el.innerHTML = renderMarkdown(ball.text);
+      const looking = el.parentElement?.querySelector(".crystalball-looking");
+      if (looking) looking.textContent = ball.looking ?? "";
       if (stick) this.#scrollDown();
     }, PAINT_MS);
   }

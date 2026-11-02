@@ -31,7 +31,8 @@ function fakeFoundry() {
     joinReply: fixture("join-reply"),
     posts: [],
     gets: 0,
-    worldPayload: fixture("world")
+    worldPayload: fixture("world"),
+    packReply: () => ({ result: [] })
   };
   f.restart = () => {
     for (const c of [f.cookie, ...f.joined]) f.forgotten.add(c);
@@ -60,7 +61,8 @@ function fakeFoundry() {
       if (!f.joined.has(cookie)) return { session: unjoined, joinData: fixture("join-data") };
       return {
         session: { ...fixture("session-joined"), sessionId: cookie },
-        world: () => f.worldPayload
+        world: () => f.worldPayload,
+        modifyDocument: request => f.packReply(request)
       };
     }
     if (cookie === ADA_SESSION)
@@ -230,6 +232,30 @@ describe("the link", () => {
     expect(ball.emitted.filter(e => e === "world")).toHaveLength(2);
     await link.world({ fresh: true });
     expect(ball.emitted.filter(e => e === "world")).toHaveLength(3);
+  });
+
+  it("reads a pack's documents with a get, as the client's own getDocuments asks", async () => {
+    const f = fakeFoundry();
+    f.packReply = request => ({ ...request, result: [{ _id: "a", name: "Fireball" }] });
+    const { link } = linkFor(f);
+    link.start();
+    await until(() => link.state().connected);
+    const docs = await link.packDocuments("book.spells", "Item");
+    expect(docs).toEqual([{ _id: "a", name: "Fireball" }]);
+    const ball = f.io.sockets.at(-1);
+    expect(ball.requests.find(r => r.event === "modifyDocument").args).toEqual([
+      { type: "Item", action: "get", operation: { pack: "book.spells", query: {} } }
+    ]);
+  });
+
+  it("throws when Foundry answers a pack's get with an error, and when dark", async () => {
+    const f = fakeFoundry();
+    f.packReply = () => ({ result: [], error: { message: "no such pack" } });
+    const { link } = linkFor(f);
+    await expect(link.packDocuments("book.spells", "Item")).rejects.toThrow(/not connected/);
+    link.start();
+    await until(() => link.state().connected);
+    await expect(link.packDocuments("book.spells", "Item")).rejects.toThrow(/no such pack/);
   });
 
   it("resumes a dropped socket on the same session when Foundry still holds it", async () => {

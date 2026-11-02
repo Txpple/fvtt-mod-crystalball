@@ -5,6 +5,8 @@
   "cacheTtl": "5m",
   "refusalFallback": true,
   "callTimeoutMs": 60000,
+  "lookupRounds": 4,
+  "lookupCalls": 8,
   "sittingRetentionDays": 90,
   "limits": {
     "perUserHour": 10,

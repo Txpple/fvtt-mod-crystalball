@@ -12,6 +12,7 @@ import { createLedger } from "./ledger.js";
 import { createLimits } from "./limits.js";
 import { enabled, log, setLevel } from "./log.js";
 import { createModel } from "./model.js";
+import { createLibrary } from "./rulebooks.js";
 import { createSittings, ensureDir } from "./sittings.js";
 
 export async function start() {
@@ -58,6 +59,7 @@ export async function start() {
     password: env.ballPassword,
     log
   });
+  const library = createLibrary({ link, log });
 
   const server = createServer({
     basePath: env.basePath,
@@ -70,6 +72,7 @@ export async function start() {
     config,
     version,
     log,
+    library,
     logEnabled: enabled
   });
 
