@@ -49,13 +49,15 @@ extra hops about three cents). Released through the reusable workflow, installed
 forged id 401 through the public hostname; the user tested it on prod ("i tested looks good"). The sandbox has 1.0.2's files `--local`,
 its manifest reading 1.0.1 until a restart; no Seer runs there now. Measured on the copies: a search answers in
 about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region page about 3,800); the tool
-definitions add about 350 tokens to the cached prefix. **On `main`, unreleased**: on the user's word ("for arcana
+definitions add about 350 tokens to the cached prefix. **1.0.3 the same evening**, on the user's word ("for arcana
 unleashed, i want chapter 5, chapter 6, appendix, and bestiary excluded"), Arcana Unleashed's Chapter 5 (magic
 items, and its magic-items pack dropped from the defaults), Chapter 6 (creatures) and Appendix (art and the
 adventure) are left out by default, then Chapter 3 (creating magical worlds; "remove Chapter 3: Creating Magical
 Worlds too"), each by a line scoped to that book (`dnd-arcana-unleashed: Chapter 5`), because the Handbook has
 a Chapter 3, 5 and 6 of its own; its bestiary was never read (actor packs are refused).
-Checked against the copied packs.
+Checked against the copied packs; released ("you can then release and put on prod"), installed on prod through the
+installer (18/18 served files byte-identical), the box's Seer at `v1.0.3`, `healthz` 1.0.3 and a forged id 401
+through the public hostname; prod's world has no saved rulebook settings, so a GM page reads the new defaults.
 
 ## The rules this module keeps
 
