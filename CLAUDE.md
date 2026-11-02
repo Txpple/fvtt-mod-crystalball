@@ -8,12 +8,19 @@ world under Foundry's ownership rule, and streams the model's answer). Part of O
 `..`, its CLAUDE.md has the family's conventions; the plan this is built from is `../docs/plans/crystalball.md`).
 Plain ES modules, no build step, no libWrapper, no socketlib, MIT.
 
-**State (2026-11-01).** Being built on the sandbox, the night of the plan: the repo scaffolded from the template,
-the contract written (`docs/seer-contract.md`), the two halves built by two agents in parallel, the ball's user
-*Crystal Ball* (role Player) made on the sandbox with `tools/ball-user.mjs`, the module deployed `--local`, enabled
-and registered there by a restart. Not released, not on GitHub, not on prod; `sync` is off in `repos.json` until the
-GitHub repo exists. No API key yet: the Seer runs its stub model, and the first real-model sitting waits for the key
-in `seer/.env`.
+**State (2026-11-02).** 0.1.0 built overnight on the sandbox and reviewed: the two halves built by two agents to
+`docs/seer-contract.md`, three reviews (the window, the Seer, Linux portability) applied, `npm run verify` green
+(312 tests), `tools/live-check.mjs --walk` GREEN against the Seer in stub mode (a temporary player owning Kartor
+asks about the Lamp of 1391; the stub names Kartor Bloodaxe (Paladin 2), 23 shared pages, 31 clues, 4 members).
+The ball's user *Crystal Ball* (role Player) exists on the sandbox, made by `tools/ball-user.mjs`, its password in
+the gitignored `seer/.env`; the module is deployed `--local`, enabled and registered there; the sandbox's Service
+URL setting must be `http://localhost:30001/crystalball` (the walk sets it for its run). Not released, not on
+GitHub, not on prod; `sync` is off in the suite's `repos.json` until the GitHub repo exists. No API key yet: the
+Seer runs its stub model, and the first real-model sitting waits for `ANTHROPIC_API_KEY` in `seer/.env` (then
+`npm run seer:dev`, open the ball as a player on the sandbox, ask). Owed before a release: the `getPackages` name
+check, the GitHub repo, a real sitting, the Linux deploy on prod (never tested on Linux: the deploy guide and the
+unit are reviewed, not run). Measured on this world: Drew's gaze ≈ 46k tokens, the lore 37k of it (the Bestiary's
+eleven pages and the four backstories are player-observable); a DM sitting carries four sheets.
 
 ## The rules this module keeps
 
