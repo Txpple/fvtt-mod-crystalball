@@ -2,19 +2,28 @@
   "name": "fvtt-mod-crystalball",
   "private": true,
   "type": "module",
-  "description": "Development tooling for Crystal Ball. NOTHING HERE SHIPS: the module is plain ES modules loaded straight from scripts/, with no build step. This file declares the gate (Biome and the unit tests).",
+  "version": "0.1.0",
+  "description": "Crystal Ball: the module is plain ES modules loaded straight from scripts/, with no build step and nothing from here shipping in it. The Seer (seer/) is a Node service run from this package: `npm ci --omit=dev` on the box installs its runtime dependencies alone. This file declares both and the gate (Biome and the unit tests).",
   "scripts": {
     "verify": "npm run check && npm run test",
     "check": "biome check --error-on-warnings .",
     "check:fix": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seer": "node seer/src/main.js",
+    "seer:dev": "node --env-file=seer/.env seer/src/main.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "socket.io-client": "^4.8.1",
+    "turndown": "^7.2.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
+    "@biomejs/biome": "^2.5.15",
+    "fvtt-mcp-dnd5e": "file:../fvtt-mcp-dnd5e",
     "vitest": "~3.2.6"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "author": "Txpple",
   "license": "MIT",
