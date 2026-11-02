@@ -23,9 +23,15 @@ password in `seer/.env`; the module is deployed `--local`, enabled and registere
 URL setting is `http://localhost:30001/crystalball`; the Seer runs from a terminal there (`npm run seer:dev`;
 PowerShell wants `npm.cmd`), never as a service. The name is free (the setup screen's `getPackages`, 7,089
 modules, has no "Crystal Ball" and no `crystalball`); on GitHub since 2026-11-02 (`Txpple/fvtt-mod-crystalball`,
-`main` pushed, `sync` on in the suite's `repos.json`, every companion's family section carrying it); not
-released, not on prod. Owed before a release: the Linux deploy on prod (never tested on Linux: the deploy guide
-and the unit are reviewed, not run). Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
+`main` pushed, `sync` on in the suite's `repos.json`, every companion's family section carrying it). **1.0.0
+released and on prod the same day**: the annotated `v1.0.0` built by the reusable workflow, `latest` serving it;
+installed through the installer, enabled, bounced; the ball's user made on prod by `tools/ball-user.mjs` with the
+sandbox's password; the Seer on the box as `crystalball.service`, the deploy guide followed to the letter (a
+system user, the clone at `v1.0.0` under `/opt/crystalball`, the env file under `/etc/crystalball`,
+`StateDirectory`, `TZ` the DM's zone, the distribution's Node 24), "foundry: connected" at once; the tunnel's
+`^/crystalball` route above the bare hostname, added in the Cloudflare dashboard (a token-run tunnel); `healthz`
+and the identity probe green through the public hostname, a forged id 401. No model call on prod yet: the first
+player's sitting is the user's. The sandbox has 1.0.0 deployed `--local`, its Foundry not yet restarted. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
 

@@ -1,6 +1,7 @@
 // The ball's user on a sandbox: the Player-role Foundry user the Seer logs in as, made or reset
 // through a GM page (the MCP's bridge), so a mirrored sandbox can be given one in a minute. On prod
-// the DM makes the user in User Management by hand; this tool never runs there.
+// it runs the same way on the user's word (FOUNDRY_HOST=generic FVTT_MCP_ENV=<the prod env>, no --env: the
+// box's env file carries the password), with the sandbox's password so a mirror keeps both Seers joined.
 //
 //   FOUNDRY_HOST=local node tools/ball-user.mjs --name "Crystal Ball" --password <pw>
 //   FOUNDRY_HOST=local node tools/ball-user.mjs --name "Crystal Ball" --password <pw> --env seer/.env
