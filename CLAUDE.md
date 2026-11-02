@@ -31,7 +31,11 @@ system user, the clone at `v1.0.0` under `/opt/crystalball`, the env file under 
 `StateDirectory`, `TZ` the DM's zone, the distribution's Node 24), "foundry: connected" at once; the tunnel's
 `^/crystalball` route above the bare hostname, added in the Cloudflare dashboard (a token-run tunnel); `healthz`
 and the identity probe green through the public hostname, a forged id 401. No model call on prod yet: the first
-player's sitting is the user's. The sandbox has 1.0.0 deployed `--local`, its Foundry not yet restarted. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
+player's sitting is the user's. **1.0.1 the same day**: a saying drawn fresh over each empty sitting (no word of
+Claude or the DM) and a 4,096-token answer cap, a cut answer marked by `done`'s `stop`; released, installed on
+prod (17/17 served files byte-identical), the box's Seer still at `v1.0.0` until the user moves it (the guide's
+Updating); the sandbox on 1.0.1, its Seer from a terminal, its Service URL set back to the local Seer after the
+mirror reset it. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
 
@@ -89,7 +93,8 @@ the four backstories are player-observable); a 1,400-token answer takes about si
   probe at `ready`, `module.api = { open, newSitting }`.
 - `scripts/window.js`: `CrystalBallWindow` (ApplicationV2 + Handlebars, one per client): the status bar, the
   transcript, the input, the stream.
-- `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `session.js` (the session id,
+- `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `saying.js` (the opening
+  saying from lang/en.json's lists), `session.js` (the session id,
   the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
 - `scripts/common.js`, `scripts/kit/`.
 - `seer/src/`: `main.js` (the entry: the Node 24 check, the process-level handlers, always runs), `config.js`
