@@ -5,6 +5,7 @@ import {
   foundryAddress,
   joinBody,
   parseJoinReply,
+  reasonOf,
   SESSION_ID,
   sessionCookie,
   sessionHash,
@@ -392,5 +393,27 @@ describe("the probe", () => {
       request: async () => ({})
     });
     await expect(link.probe(ADA_SESSION)).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("reasonOf", () => {
+  it("names the refusals an AggregateError hides behind its empty message", () => {
+    const err = new AggregateError(
+      [
+        Object.assign(new Error("connect ECONNREFUSED ::1:30000"), { code: "ECONNREFUSED" }),
+        Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:30000"), { code: "ECONNREFUSED" })
+      ],
+      ""
+    );
+    expect(reasonOf(err)).toBe(
+      "connect ECONNREFUSED ::1:30000; connect ECONNREFUSED 127.0.0.1:30000"
+    );
+  });
+
+  it("keeps a plain message, falls back to the code, then to a word", () => {
+    expect(reasonOf(new Error("join refused (403)"))).toBe("join refused (403)");
+    expect(reasonOf(Object.assign(new Error(""), { code: "ETIMEDOUT" }))).toBe("ETIMEDOUT");
+    expect(reasonOf(undefined)).toBe("unknown error");
+    expect(reasonOf("plain")).toBe("plain");
   });
 });

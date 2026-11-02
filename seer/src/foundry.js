@@ -29,6 +29,24 @@ export const SESSION_ID = /^[A-Za-z0-9]{8,64}$/;
 
 export const sessionHash = id => createHash("sha256").update(String(id)).digest("hex");
 
+/**
+ * An error's reason for a log line. A connect to `localhost` that ::1 and 127.0.0.1 both refuse
+ * fails with an AggregateError whose own message is empty and whose refusals sit in `errors`:
+ * those are joined, so the line names the refused addresses instead of nothing.
+ * @param {unknown} err
+ * @returns {string}
+ */
+export function reasonOf(err) {
+  if (err && typeof err === "object" && Array.isArray(err.errors) && err.errors.length) {
+    const inner = err.errors.map(reasonOf).filter(Boolean);
+    const own = String(err.message ?? "").trim();
+    return own ? `${own}: ${inner.join("; ")}` : inner.join("; ");
+  }
+  const message = String(err?.message ?? err ?? "").trim();
+  if (message) return message;
+  return err?.code ? String(err.code) : "unknown error";
+}
+
 /** An HTTP request with Node's own client: `{ status, headers, body }`; no redirect followed. */
 export function httpRequest(
   url,
@@ -141,7 +159,7 @@ function nextEvent(socket, event, ms) {
       ms
     );
     const onEvent = value => done(null, value);
-    const onError = err => done(new Error(`socket: ${err?.message ?? err}`));
+    const onError = err => done(new Error(`socket: ${reasonOf(err)}`));
     function done(err, value) {
       clearTimeout(timer);
       socket.off?.(event, onEvent);
@@ -333,7 +351,7 @@ export function createLink({
     });
     log.info("foundry: connected", { world: state.world, ballUser: state.ballUser });
     await fetchWorld().catch(err =>
-      log.warn("foundry: first world fetch failed", { error: err.message })
+      log.warn("foundry: first world fetch failed", { error: reasonOf(err) })
     );
   }
 
@@ -345,8 +363,9 @@ export function createLink({
     } catch (err) {
       teardown();
       if (/world-closed/.test(err?.message ?? "")) state.worldOpen = false;
-      log.warn("foundry: not connected", { error: err?.message ?? String(err) });
-      schedule(err?.message ?? "error");
+      const reason = reasonOf(err);
+      log.warn("foundry: not connected", { error: reason });
+      schedule(reason);
     } finally {
       running = false;
     }
