@@ -38,13 +38,18 @@ prod (17/17 served files byte-identical), the box's Seer at `v1.0.1` by the guid
 mirror reset it. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
-**The rulebooks, committed on `main`, unreleased**: the ball looks up the Player's Handbook, Arcana
-Unleashed and Heroes of Faerûn through two tools (`rulebooks.js`, the contract's *The rulebooks*), instructions
-version 3; `npm run verify` green; exercised against copies of the three books' packs (and dnd5e's `content24`,
-which the Handbook's glossary embeds) read off disk, never through the sandbox, which was busy. Not
-yet run: the socket's pack get against a live Foundry, a real model call with the tools, the window's lookup line
-in a browser. Measured on the copies: a search answers in about 250 to 380 tokens, a read in 40 to 1,100 (a long
-Heroes of Faerûn region page about 3,800); the tool definitions add about 350 tokens to the cached prefix.
+**1.0.2 the same evening, the rulebooks**: the ball looks up the Player's Handbook, Arcana Unleashed and Heroes
+of Faerûn through two tools (`rulebooks.js`, the contract's *The rulebooks*), instructions version 3; built
+against copies of the three books' packs (and dnd5e's `content24`, which the Handbook's glossary embeds) while the
+sandbox was busy, then `tools/live-check.mjs --walk --question "What does the Fireball spell do, and which
+classes can cast it?" --expect-lookup` GREEN on the real model: the window showed the search and the read lines,
+the answer in 15 seconds, two lookups, $0.38, nearly all of it the first write of a 66k-token gaze (the lookups'
+extra hops about three cents). Released through the reusable workflow, installed on prod through the installer
+(18/18 served files byte-identical), the box's Seer at `v1.0.2` by the guide's Updating, `healthz` 1.0.2 and a
+forged id 401 through the public hostname; no rulebook call on prod yet. The sandbox has 1.0.2's files `--local`,
+its manifest reading 1.0.1 until a restart; no Seer runs there now. Measured on the copies: a search answers in
+about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region page about 3,800); the tool
+definitions add about 350 tokens to the cached prefix.
 
 ## The rules this module keeps
 
