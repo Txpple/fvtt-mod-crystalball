@@ -295,9 +295,44 @@ export function shelfOf(pack, docs, book) {
   return entries;
 }
 
-/** Whether an entry is left out by name: its own, or any folder or entry above it. */
-export const leftOut = (entry, leave) =>
-  leave.size > 0 && [entry.name, ...entry.path].some(n => leave.has(norm(n)));
+/** A leave-out line that names its book: `<package or pack id>: <name>`. */
+const SCOPED = /^([a-z0-9][a-z0-9_-]*(?:\.[a-z0-9_-]+)?)\s*:\s*(.+)$/;
+
+/**
+ * The `rulebookLeaveOut` lines as rules: a plain name leaves out what it names in every book; a
+ * line led by a package or pack id the world has and a colon (`dnd-arcana-unleashed: Chapter 5`)
+ * leaves it out of that book alone, since books share folder names (two books' "Chapter 5").
+ * A line whose lead is no known id is a plain name ("Appendix B: Creature Stat Blocks").
+ * @param {string[]} lines
+ * @param {Iterable<string>} ids  the package and pack ids the world has
+ */
+export function leaveOutRules(lines, ids) {
+  const known = new Set(ids);
+  const names = new Set();
+  const scoped = new Map();
+  for (const line of lines ?? []) {
+    const m = SCOPED.exec(String(line).trim());
+    if (m && known.has(m[1])) {
+      if (!scoped.has(m[1])) scoped.set(m[1], new Set());
+      scoped.get(m[1]).add(norm(m[2]));
+    } else {
+      names.add(norm(line));
+    }
+  }
+  return { names, scoped };
+}
+
+/**
+ * Whether an entry is left out by name: its own, or any folder or entry above it, by a plain rule
+ * or one scoped to its pack or its package. A bare Set is the plain names alone.
+ */
+export function leftOut(entry, rules) {
+  const { names, scoped } = rules instanceof Set ? { names: rules, scoped: new Map() } : rules;
+  const words = [entry.name, ...entry.path].map(norm);
+  const pkg = String(entry.pack ?? "").split(".")[0];
+  const sets = [names, scoped.get(entry.pack), scoped.get(pkg)].filter(s => s?.size);
+  return sets.some(set => words.some(w => set.has(w)));
+}
 
 /**
  * What the loaded entries say about each other: the item each uuid is, which class, subclass,
@@ -897,7 +932,10 @@ export function createLibrary({
       const mine = table.filter(p => packOpenTo(p, user, opts));
       const mineIds = new Set(mine.map(packIdOf));
       const packsById = new Map((world?.packs ?? []).map(p => [packIdOf(p), p]));
-      const leave = new Set((settings?.rulebookLeaveOut ?? []).map(norm));
+      const leave = leaveOutRules(
+        settings?.rulebookLeaveOut,
+        [...packsById.keys(), ...(world?.packs ?? []).map(p => p?.packageName)].filter(Boolean)
+      );
       const books = [...new Set(table.map(p => bookOf(world, p)))];
       const definitions = toolDefinitions(books);
 

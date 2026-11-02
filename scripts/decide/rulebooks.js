@@ -23,19 +23,25 @@ export const DEFAULT_RULEBOOKS = [
   "dnd-arcana-unleashed.feats",
   "dnd-arcana-unleashed.spells",
   "dnd-arcana-unleashed.bastions",
-  "dnd-arcana-unleashed.items",
   "dnd-heroes-faerun.book",
   "dnd-heroes-faerun.options",
   "dnd-heroes-faerun.items"
 ].join("\n");
 
-/** What the ball never reads in those books: the stat blocks and creatures, the adventure, the credits and change logs. */
+/**
+ * What the ball never reads in those books: the Handbook's stat blocks; Arcana Unleashed's magic
+ * items (Chapter 5), creatures (Chapter 6) and adventure (the Appendix), each scoped to that book
+ * because the Handbook has a Chapter 5 and 6 of its own; the credits and change logs.
+ */
 export const DEFAULT_LEAVE_OUT = [
   "Appendix B: Creature Stat Blocks",
-  "Chapter 6: Magical Creatures",
-  "Magical Creatures",
-  "Tomb of the Shadow Serpents",
+  "dnd-arcana-unleashed: Chapter 5",
+  "dnd-arcana-unleashed: Chapter 5: Magic Items",
+  "dnd-arcana-unleashed: Chapter 6",
+  "dnd-arcana-unleashed: Chapter 6: Magical Creatures",
+  "dnd-arcana-unleashed: Appendix",
   "Credits",
+  "Foundry Conversion Credits",
   "Changelog",
   "Player's Handbook Changelog",
   "Heroes of Faerûn Change Log"

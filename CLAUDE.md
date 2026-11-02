@@ -49,7 +49,12 @@ extra hops about three cents). Released through the reusable workflow, installed
 forged id 401 through the public hostname; the user tested it on prod ("i tested looks good"). The sandbox has 1.0.2's files `--local`,
 its manifest reading 1.0.1 until a restart; no Seer runs there now. Measured on the copies: a search answers in
 about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region page about 3,800); the tool
-definitions add about 350 tokens to the cached prefix.
+definitions add about 350 tokens to the cached prefix. **On `main`, unreleased**: on the user's word ("for arcana
+unleashed, i want chapter 5, chapter 6, appendix, and bestiary excluded"), Arcana Unleashed's Chapter 5 (magic
+items, and its magic-items pack dropped from the defaults), Chapter 6 (creatures) and Appendix (art and the
+adventure) are left out by default, each by a line scoped to that book (`dnd-arcana-unleashed: Chapter 5`),
+because the Handbook has a Chapter 5 and 6 of its own; its bestiary was never read (actor packs are refused).
+Checked against the copied packs.
 
 ## The rules this module keeps
 
@@ -83,8 +88,9 @@ definitions add about 350 tokens to the cached prefix.
   Board record; the player's own pages and curated sheets), the permission rule mirroring `testUserPermission` at
   OBSERVER, each layer a cached system block so a party shares the first three. The gaze is never written to disk.
 - **The rulebooks are looked up, never put in the gaze** (`seer/src/rulebooks.js`): the packs the *Rulebooks*
-  setting names (journal and item packs only, never a bestiary; an embedded stat block dropped, the creature
-  chapters and the adventure in *Left out of the rulebooks*), read off the ball's socket on first need and held,
+  setting names (journal and item packs only, never a bestiary; an embedded stat block dropped; what else stays
+  out by name in *Left out of the rulebooks*, a line led by `<book id>: ` counting for that book alone, since
+  books share chapter names), read off the ball's socket on first need and held,
   searched and read through two tools the model calls (`search_rulebooks`, `read_rulebook`), at most four rounds
   and eight calls an answer, the last hop answering only. Foundry checks no read permission on a compendium get,
   so the Seer applies the pack's ownership as `getUserLevel` does, per asker. The tool definitions are the same

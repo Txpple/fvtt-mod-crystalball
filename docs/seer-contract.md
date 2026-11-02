@@ -90,7 +90,7 @@ Scope `world`, namespace `fvtt-mod-crystalball`, registered by the module, read 
 | `gmGaze` | `"player"` \| `"all"` | `"player"` | a GM's gaze: what every player sees plus the GM's own pages, or everything |
 | `modelLabel` | string | (unset) | reserved; the window shows what `healthz` reports |
 | `rulebooks` | string | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn's player packs (`scripts/decide/rulebooks.js`) | the compendium packs the ball may look things up in, one pack id a line (commas too); empty: no lookups |
-| `rulebookLeaveOut` | string | the stat-block and creature chapters, Arcana Unleashed's adventure, credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents |
+| `rulebookLeaveOut` | string | the Handbook's stat-block appendix; Arcana Unleashed's Chapters 5 and 6 and Appendix (magic items, creatures, adventure); credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents; a line led by a package or pack id the world has and a colon (`dnd-arcana-unleashed: Chapter 5`) applies to that book alone |
 
 ## The gaze
 
@@ -141,7 +141,8 @@ at the table (the books' names in them, never the asker's view), so they cache a
 
 The entries are an item pack's items of those kinds (never a monster's feature) and a journal pack's text, rule
 and class or subclass spell-list pages (class, subclass, image, map, video and pdf pages never). An entry whose
-name, entry or folder is in `rulebookLeaveOut` is neither found nor read.
+name, entry or folder is in `rulebookLeaveOut` is neither found nor read; a scoped line counts only for entries of
+its package or pack (books share folder names: the Handbook and Arcana Unleashed both have a "Chapter 5").
 
 **Whose view**: Foundry 14.369 checks no read permission on a compendium get, so the Seer applies it: a pack's
 level for a user is the highest level of any role they hold in `core.compendiumConfiguration[<pack>].ownership`

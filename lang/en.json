@@ -29,7 +29,7 @@
       },
       "rulebookLeaveOut": {
         "name": "Left out of the rulebooks",
-        "hint": "Folders, journal entries and pages the ball never reads in those packs, one name a line: the creatures, an adventure, anything you keep for yourself."
+        "hint": "Folders, journal entries and pages the ball never reads in those packs, one name a line: the creatures, an adventure, anything you keep for yourself. Lead a line with a book's id and a colon to leave a name out of that book alone (dnd-arcana-unleashed: Chapter 5), since books share chapter names."
       },
       "gmGaze": {
         "name": "The GM's gaze",

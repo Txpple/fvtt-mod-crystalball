@@ -8,6 +8,7 @@ import {
   capped,
   createLibrary,
   crossIndex,
+  leaveOutRules,
   leftOut,
   norm,
   packLevel,
@@ -463,6 +464,43 @@ describe("a pack's entries", () => {
     expect(leftOut(entry, new Set([norm("Hiding")]))).toBe(true);
     expect(leftOut(entry, new Set([norm("Combat")]))).toBe(false);
     expect(norm("Heroes of Faerûn")).toBe("heroes of faerun");
+  });
+
+  it("are left out of one book alone by a line led by its package or pack id", () => {
+    const ids = ["book-one", "book-one.content", "book-two"];
+    const rules = leaveOutRules(
+      [
+        "book-one: Chapter 1",
+        "book-two.secrets: Rules",
+        "Appendix B: Creature Stat Blocks",
+        "nowhere: Rules"
+      ],
+      ids
+    );
+    expect([...rules.scoped.keys()]).toEqual(["book-one"]);
+    expect([...rules.names]).toEqual([
+      "book two secrets rules",
+      "appendix b creature stat blocks",
+      "nowhere rules"
+    ]);
+    const [entry] = shelfOf(packOf("book-one.content"), DOCS["book-one.content"], "Book One");
+    expect(leftOut(entry, rules)).toBe(true);
+    expect(leftOut(entry, leaveOutRules(["book-two: Chapter 1"], ids))).toBe(false);
+    expect(leftOut(entry, leaveOutRules(["book-one.content: Rules"], ids))).toBe(true);
+    expect(
+      leftOut(entry, leaveOutRules(["book-one.spells: Rules"], [...ids, "book-one.spells"]))
+    ).toBe(false);
+  });
+
+  it("keep one book's chapter when another book's same-named chapter is left out", async () => {
+    const settings = { ...SETTINGS, rulebookLeaveOut: ["book-two: Chapter 1"] };
+    expect((await search(deskFor(PLAYER, settings).desk, "hiding")).content).toContain(
+      "Rules › Hiding"
+    );
+    const scoped = { ...SETTINGS, rulebookLeaveOut: ["book-one: Chapter 1"] };
+    const desk = deskFor(PLAYER, scoped).desk;
+    expect((await search(desk, "hiding")).content).toMatch(/^Nothing/);
+    expect((await search(desk, "ember lance")).content).toContain("Ember Lance");
   });
 });
 
