@@ -1,0 +1,6 @@
+{
+  "comment": "POST /join with a wrong password on 14.369: 401 and a plain-text message key. Synthetic.",
+  "status": 401,
+  "headers": { "content-type": "text/html; charset=utf-8" },
+  "body": "JOIN.ErrorInvalidPassword"
+}

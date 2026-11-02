@@ -1,0 +1,34 @@
+# The Seer as a systemd service. A template: copy it to /etc/systemd/system/crystalball.service and
+# replace every <placeholder> with your box's values. seer/deploy/README.md walks through it.
+
+[Unit]
+Description=Open Roll 5e: Crystal Ball (the Seer)
+# The Seer waits for Foundry by itself (it reconnects with backoff), so ordering is a courtesy.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<service-user>
+Group=<service-group>
+# The clone of the fvtt-mod-crystalball repository, checked out at a release tag.
+WorkingDirectory=<path-to-the-clone>
+ExecStart=/usr/bin/node seer/src/main.js
+# The key, the ball's password and the rest of seer/.env.example; owned by the service user, mode 0600.
+EnvironmentFile=<path-to-the-env-file>
+Restart=always
+RestartSec=5
+# SIGTERM lets the Seer close its socket and open streams cleanly.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# The Seer reads its clone and writes only its data directory.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=<path-to-the-data-dir>
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

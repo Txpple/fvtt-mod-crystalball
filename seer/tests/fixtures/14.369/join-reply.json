@@ -1,0 +1,6 @@
+{
+  "comment": "POST /join {action:'join', userId, password} on 14.369 (sessions.mjs authenticateUser): the session on the request's cookie is joined and the reply names success; no new cookie when the request carried one. Synthetic.",
+  "status": 200,
+  "headers": { "content-type": "application/json; charset=utf-8" },
+  "body": "{\"request\":\"join\",\"status\":\"success\",\"message\":\"JOIN.LoginSuccess\",\"redirect\":\"/game\"}"
+}

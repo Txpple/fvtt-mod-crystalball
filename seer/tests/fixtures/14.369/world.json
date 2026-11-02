@@ -1,0 +1,719 @@
+{
+  "userId": "ballUser00000001",
+  "release": { "generation": 14, "channel": "stable", "build": 369 },
+  "world": { "id": "test-world", "title": "Test World" },
+  "system": { "id": "dnd5e", "version": "6.0.6" },
+  "modules": [
+    {
+      "id": "fvtt-mod-crystalball",
+      "title": "Open Roll 5e: Crystal Ball",
+      "version": "0.1.0",
+      "active": true
+    },
+    {
+      "id": "fvtt-mod-clueboard",
+      "title": "Open Roll 5e: Clue Board",
+      "version": "1.2.6",
+      "active": true
+    }
+  ],
+  "activeUsers": ["ballUser00000001", "playerAda0000001"],
+  "users": [
+    { "_id": "gmUser0000000001", "name": "Game Master", "role": 4, "character": null },
+    { "_id": "assistGm00000001", "name": "Aide", "role": 3, "character": null },
+    { "_id": "playerAda0000001", "name": "Ada", "role": 1, "character": "charAda000000001" },
+    { "_id": "playerBen0000001", "name": "Ben", "role": 1, "character": "charBen000000001" },
+    { "_id": "playerCy00000001", "name": "Cy", "role": 1, "character": null },
+    { "_id": "ballUser00000001", "name": "Crystal Ball", "role": 1, "character": null }
+  ],
+  "folders": [
+    {
+      "_id": "folderLore000001",
+      "name": "Lore",
+      "type": "JournalEntry",
+      "folder": null,
+      "sort": 100,
+      "sorting": "a"
+    },
+    {
+      "_id": "folderDiary00001",
+      "name": "Diaries",
+      "type": "JournalEntry",
+      "folder": "folderLore000001",
+      "sort": 0,
+      "sorting": "a"
+    },
+    {
+      "_id": "folderGm00000001",
+      "name": "Secrets",
+      "type": "JournalEntry",
+      "folder": null,
+      "sort": 300,
+      "sorting": "a"
+    }
+  ],
+  "journal": [
+    {
+      "_id": "jrnHandouts00001",
+      "name": "Handouts",
+      "folder": "folderLore000001",
+      "sort": 200,
+      "ownership": { "default": 2, "assistGm00000001": 3 },
+      "pages": [
+        {
+          "_id": "pgMap0000000001x",
+          "name": "Map",
+          "type": "image",
+          "sort": 200,
+          "ownership": { "default": 2 },
+          "title": { "show": true, "level": 1 },
+          "image": { "caption": "The old map of the valley." },
+          "src": "worlds/test-world/map.webp",
+          "text": { "content": null, "format": 1 }
+        },
+        {
+          "_id": "pgGuide000000001",
+          "name": "Guide",
+          "type": "text",
+          "sort": 100,
+          "ownership": { "default": -1 },
+          "title": { "show": true, "level": 1 },
+          "image": {},
+          "src": null,
+          "text": {
+            "format": 1,
+            "content": "<h1>The Valley</h1><p>Ask for @UUID[Actor.npcSmith0000001]{the smith} at the forge, or find @UUID[Actor.npcSmith0000001] yourself. The @UUID[Compendium.dnd5e.rules.JournalEntry.abc]{rules} say a lot; @UUID[Compendium.dnd5e.rules.JournalEntry.abc] says nothing.</p><ul><li>Bring rope.</li><li>Keep to the road.</li></ul><p><img src=\"worlds/test-world/well.webp\" alt=\"A well with a broken rope\"></p><table><tr><th>Day</th><th>Weather</th></tr><tr><td>One</td><td>Rain</td></tr></table><section class=\"secret\" id=\"secret-abc\"><p>GM ONLY: the well hides the vault.</p></section><script>alert('x')</script><style>p{color:red}</style><p>Make a [[/check ability=wis skill=prc dc=12]] to spot the path, or suffer [[/damage 2d6 fire]].</p>"
+          }
+        },
+        {
+          "_id": "pgHidden00000001",
+          "name": "Hidden Note",
+          "type": "text",
+          "sort": 300,
+          "ownership": { "default": 0 },
+          "text": {
+            "format": 1,
+            "content": "<p>HIDDEN-PAGE-TEXT: nobody but the GM reads this.</p>"
+          }
+        },
+        {
+          "_id": "pgAdaOnly0000001",
+          "name": "Letter for Ada",
+          "type": "text",
+          "sort": 400,
+          "ownership": { "default": 0, "playerAda0000001": 2 },
+          "text": {
+            "format": 1,
+            "content": "<p>ADA-LETTER-TEXT: your aunt is alive.</p><section class=\"secret\"><p>ADA-LETTER-SECRET</p></section>"
+          }
+        }
+      ]
+    },
+    {
+      "_id": "jrnDiary00000001",
+      "name": "Diary",
+      "folder": "folderDiary00001",
+      "sort": 0,
+      "ownership": { "default": 2 },
+      "pages": [
+        {
+          "_id": "pgSession2000001",
+          "name": "Session 2",
+          "type": "text",
+          "sort": 200,
+          "ownership": { "default": -1 },
+          "text": { "format": 1, "content": "<p>SESSION-TWO-TEXT: the party reached the well.</p>" }
+        },
+        {
+          "_id": "pgSession1000001",
+          "name": "Session 1",
+          "type": "text",
+          "sort": 100,
+          "ownership": { "default": -1 },
+          "text": {
+            "format": 1,
+            "content": "<p>SESSION-ONE-TEXT: the party met in the tavern and took the job from the miller, who paid in old coin and told them about the road north, the well at the crossing, the bridge that floods every spring, and the smith who has not left his forge in a year. They argued about the price, slept badly, and set out before dawn with two days of food and one lantern between them. On the road they met a pedlar who sold them a map he swore was true, and a dog that followed them for a mile and then turned back as if it knew better.</p>"
+          }
+        }
+      ]
+    },
+    {
+      "_id": "jrnGmOnly0000001",
+      "name": "GM Notes",
+      "folder": "folderGm00000001",
+      "sort": 0,
+      "ownership": { "default": 0, "gmUser0000000001": 3 },
+      "pages": [
+        {
+          "_id": "pgPlot0000000001",
+          "name": "The Plot",
+          "type": "text",
+          "sort": 0,
+          "ownership": { "default": -1 },
+          "text": { "format": 1, "content": "<p>GM-PLOT-TEXT: the smith is the thief.</p>" }
+        }
+      ]
+    },
+    {
+      "_id": "jrnBackstory0001",
+      "name": "Ben's Backstory",
+      "folder": null,
+      "sort": 0,
+      "ownership": { "default": 0, "playerBen0000001": 3 },
+      "pages": [
+        {
+          "_id": "pgBenStory000001",
+          "name": "Where Ben Comes From",
+          "type": "text",
+          "sort": 0,
+          "ownership": { "default": -1 },
+          "text": {
+            "format": 1,
+            "content": "<p>BEN-STORY-TEXT: a mill by the river.</p><section class=\"secret\"><p>BEN-STORY-SECRET</p></section>"
+          }
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "_id": "clueKey000000001",
+      "name": "The Bent Key",
+      "type": "fvtt-mod-clueboard.clue",
+      "ownership": { "default": 0 },
+      "system": {
+        "kind": "object",
+        "text": "<p>A key bent at the bow.</p><section class=\"secret\"><p>CLUE-SECRET: the smith bent it.</p></section>",
+        "foundAt": "Under the vault door."
+      }
+    },
+    {
+      "_id": "clueNote00000001",
+      "name": "The Torn Note",
+      "type": "fvtt-mod-clueboard.clue",
+      "ownership": { "default": 0 },
+      "system": {
+        "kind": "document",
+        "text": "<p>Meet me where @UUID[Actor.npcSmith0000001] cannot hear.</p>",
+        "foundAt": "In the ash of the hearth."
+      }
+    },
+    {
+      "_id": "clueUnheld000001",
+      "name": "The Uncollected Clue",
+      "type": "fvtt-mod-clueboard.clue",
+      "ownership": { "default": 0 },
+      "system": {
+        "kind": "rumour",
+        "text": "<p>UNCOLLECTED-CLUE-TEXT</p>",
+        "foundAt": "Nowhere yet."
+      }
+    }
+  ],
+  "actors": [
+    {
+      "_id": "npcSmith0000001",
+      "name": "Oren the Smith",
+      "type": "npc",
+      "ownership": { "default": 0 },
+      "system": {},
+      "items": [],
+      "effects": []
+    },
+    {
+      "_id": "grpParty00000001",
+      "name": "The Party",
+      "type": "group",
+      "ownership": { "default": 3, "gmUser0000000001": 3 },
+      "system": {
+        "currency": { "pp": 0, "gp": 100, "ep": 0, "sp": 5, "cp": 0 },
+        "members": [{ "actor": "charAda000000001" }, { "actor": "charBen000000001" }]
+      },
+      "items": [
+        {
+          "_id": "stashRope0000001",
+          "name": "Rope",
+          "type": "consumable",
+          "sort": 100,
+          "system": { "quantity": 1 }
+        },
+        {
+          "_id": "stashSack0000001",
+          "name": "Sack",
+          "type": "container",
+          "sort": 200,
+          "system": { "quantity": 1 }
+        },
+        {
+          "_id": "stashRation00001",
+          "name": "Rations",
+          "type": "consumable",
+          "sort": 300,
+          "system": { "quantity": 5, "container": "stashSack0000001" }
+        }
+      ],
+      "effects": [],
+      "flags": {
+        "fvtt-mod-clueboard": {
+          "schema": 2,
+          "entries": {
+            "clueNote00000001": {
+              "id": "clueNote00000001",
+              "kind": "document",
+              "source": { "uuid": "Item.clueNote00000001", "name": "The Torn Note" },
+              "snapshot": {
+                "name": "The Torn Note",
+                "img": "",
+                "html": "<p>old snapshot</p>",
+                "foundAt": "In the ash.",
+                "revision": 1,
+                "at": "2026-10-02T10:00:00.000Z",
+                "kind": "document"
+              },
+              "foundIn": {
+                "sceneId": "",
+                "sceneName": "",
+                "calendarDate": "",
+                "realDate": "2026-10-02T10:00:00.000Z"
+              },
+              "readers": {},
+              "notes": "",
+              "threads": { "thrWho0000000001": { "at": "2026-10-03T10:00:00.000Z", "order": 1 } }
+            },
+            "clueKey000000001": {
+              "id": "clueKey000000001",
+              "kind": "object",
+              "source": { "uuid": "Item.clueKey000000001", "name": "The Bent Key" },
+              "snapshot": {
+                "name": "The Bent Key",
+                "img": "",
+                "html": "<p>A key bent at the bow.</p>",
+                "foundAt": "Under the vault door.",
+                "revision": 1,
+                "at": "2026-10-01T10:00:00.000Z",
+                "kind": "object"
+              },
+              "foundIn": {
+                "sceneId": "",
+                "sceneName": "",
+                "calendarDate": "",
+                "realDate": "2026-10-01T10:00:00.000Z"
+              },
+              "readers": {
+                "charBen000000001": {
+                  "actorId": "charBen000000001",
+                  "actorName": "Ben Reed",
+                  "userId": "playerBen0000001",
+                  "at": "2026-10-04T10:00:00.000Z"
+                },
+                "charAda000000001": {
+                  "actorId": "charAda000000001",
+                  "actorName": "Ada (old name)",
+                  "userId": "playerAda0000001",
+                  "at": "2026-10-03T10:00:00.000Z"
+                }
+              },
+              "notes": "We should ask the smith.",
+              "threads": { "thrWho0000000001": { "at": "2026-10-03T10:00:00.000Z", "order": 0 } }
+            }
+          },
+          "threads": {
+            "thrWho0000000001": {
+              "id": "thrWho0000000001",
+              "name": "Who took the key?",
+              "colour": "gold",
+              "question": "Who opened the vault?",
+              "status": "open",
+              "stand": "Someone with a key.",
+              "order": 0,
+              "at": "2026-10-03T09:00:00.000Z",
+              "by": "playerAda0000001"
+            }
+          }
+        }
+      }
+    },
+    {
+      "_id": "charAda000000001",
+      "name": "Ada Stone",
+      "type": "character",
+      "ownership": {
+        "default": 0,
+        "playerAda0000001": 3,
+        "playerBen0000001": 2,
+        "gmUser0000000001": 3
+      },
+      "system": {
+        "abilities": {
+          "str": { "value": 16, "proficient": 1 },
+          "dex": { "value": 12, "proficient": 0 },
+          "con": { "value": 14, "proficient": 1 },
+          "int": { "value": 10, "proficient": 0 },
+          "wis": { "value": 12, "proficient": 0 },
+          "cha": { "value": 8, "proficient": 0 }
+        },
+        "skills": {
+          "ath": { "ability": "str", "value": 1, "bonuses": { "check": "" } },
+          "prc": { "ability": "wis", "value": 1, "bonuses": { "check": "" } },
+          "itm": { "ability": "cha", "value": 2, "bonuses": { "check": "" } }
+        },
+        "tools": {},
+        "currency": { "pp": 0, "gp": 15, "ep": 0, "sp": 3, "cp": 0 },
+        "spells": {
+          "spell1": { "value": 0, "override": null },
+          "pact": { "value": 0, "override": null }
+        },
+        "attributes": {
+          "ac": {
+            "calcs": ["unarmored", "armored"],
+            "flat": null,
+            "formulas": [],
+            "override": null
+          },
+          "init": { "ability": "" },
+          "movement": { "speeds": {}, "units": null, "hover": false },
+          "senses": { "ranges": { "darkvision": null }, "units": null, "special": "" },
+          "hp": { "value": 20, "max": null, "temp": 3, "tempmax": 0, "bonuses": {} },
+          "death": { "success": 0, "failure": 0 },
+          "exhaustion": 0,
+          "inspiration": false
+        },
+        "details": {
+          "race": "raceDwarf0000001",
+          "background": "bgSoldier0000001",
+          "originalClass": "clsFighter000001",
+          "alignment": "Neutral Good",
+          "xp": { "value": 900 },
+          "ideal": "Protect the road.",
+          "biography": { "value": "<p>ADA-BIO: raised by her aunt.</p>" }
+        },
+        "traits": {
+          "size": "med",
+          "languages": { "value": ["common", "dwarvish"], "custom": "" },
+          "weaponProf": {
+            "value": ["sim", "mar"],
+            "custom": "",
+            "mastery": { "value": ["longsword"] }
+          },
+          "armorProf": { "value": ["lgt", "med", "hvy", "shl"], "custom": "" },
+          "dr": { "value": ["poison"], "custom": "" }
+        }
+      },
+      "items": [
+        {
+          "_id": "clsFighter000001",
+          "name": "Fighter",
+          "type": "class",
+          "sort": 0,
+          "system": {
+            "identifier": "fighter",
+            "levels": 3,
+            "hd": { "denomination": "d10", "spent": 1 },
+            "spellcasting": { "progression": "none" },
+            "advancement": {
+              "hp1": {
+                "_id": "hp1",
+                "type": "HitPoints",
+                "value": { "1": "max", "2": "avg", "3": 6 }
+              }
+            }
+          }
+        },
+        {
+          "_id": "subChampion00001",
+          "name": "Champion",
+          "type": "subclass",
+          "sort": 0,
+          "system": { "identifier": "champion", "classIdentifier": "fighter" }
+        },
+        {
+          "_id": "raceDwarf0000001",
+          "name": "Dwarf",
+          "type": "race",
+          "sort": 0,
+          "system": {
+            "movement": { "speeds": { "walk": "30" }, "units": null },
+            "senses": { "ranges": { "darkvision": 120 }, "units": null, "special": "" }
+          }
+        },
+        {
+          "_id": "bgSoldier0000001",
+          "name": "Soldier",
+          "type": "background",
+          "sort": 0,
+          "system": {}
+        },
+        {
+          "_id": "featTough0000001",
+          "name": "Tough",
+          "type": "feat",
+          "sort": 100,
+          "system": {
+            "type": { "value": "feat" },
+            "description": { "value": "<p>Your hit point maximum rises by 2 per level.</p>" }
+          },
+          "effects": [
+            {
+              "_id": "effTough00000001",
+              "name": "Tough",
+              "transfer": true,
+              "disabled": false,
+              "type": "base",
+              "system": {
+                "changes": [
+                  { "key": "system.attributes.hp.bonuses.level", "value": 2, "type": "add" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "_id": "featWind00000001",
+          "name": "Second Wind",
+          "type": "feat",
+          "sort": 200,
+          "system": {
+            "type": { "value": "class" },
+            "uses": { "max": "2", "spent": 1 },
+            "description": {
+              "value": "<p>Regain 1d10 + your Fighter level hit points as a bonus action.</p>"
+            }
+          }
+        },
+        {
+          "_id": "wpnSword00000001",
+          "name": "Longsword",
+          "type": "weapon",
+          "sort": 100,
+          "system": {
+            "quantity": 1,
+            "equipped": true,
+            "attuned": false,
+            "attunement": "",
+            "properties": ["ver"],
+            "mastery": "sap",
+            "damage": {
+              "base": { "number": 1, "denomination": 8, "types": ["slashing"], "bonus": "" },
+              "versatile": { "number": 1, "denomination": 10, "types": ["slashing"], "bonus": "" }
+            },
+            "description": { "value": "<p>A plain blade.</p>" }
+          }
+        },
+        {
+          "_id": "armChain00000001",
+          "name": "Chain Mail",
+          "type": "equipment",
+          "sort": 200,
+          "system": {
+            "quantity": 1,
+            "equipped": true,
+            "type": { "value": "heavy" },
+            "armor": { "value": 16, "dex": 0 },
+            "description": { "value": "" }
+          }
+        },
+        {
+          "_id": "armShield0000001",
+          "name": "Shield",
+          "type": "equipment",
+          "sort": 300,
+          "system": {
+            "quantity": 1,
+            "equipped": true,
+            "type": { "value": "shield" },
+            "armor": { "value": 2, "dex": null },
+            "description": { "value": "" }
+          }
+        },
+        {
+          "_id": "conPotion0000001",
+          "name": "Potion of Healing",
+          "type": "consumable",
+          "sort": 100,
+          "system": {
+            "quantity": 2,
+            "uses": { "max": "1", "spent": 0 },
+            "description": { "value": "<p>Drink to regain [[/heal 2d4 + 2]] hit points.</p>" }
+          }
+        },
+        {
+          "_id": "lootRing00000001",
+          "name": "Real Ring of Spite",
+          "type": "equipment",
+          "sort": 400,
+          "system": {
+            "quantity": 1,
+            "equipped": false,
+            "identified": false,
+            "unidentified": { "name": "Plain Ring", "description": "<p>A ring of grey metal.</p>" },
+            "type": { "value": "ring" },
+            "attunement": "required",
+            "attuned": false,
+            "description": { "value": "<p>TRUE-RING-TEXT: curses the wearer.</p>" }
+          },
+          "effects": [
+            {
+              "_id": "effSpite0000001x",
+              "name": "Spite",
+              "transfer": true,
+              "disabled": false,
+              "type": "base",
+              "system": {
+                "changes": [{ "key": "system.attributes.ac.bonus", "value": -5, "type": "add" }]
+              }
+            }
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "_id": "effBloodied00001",
+          "name": "Bloodied",
+          "disabled": false,
+          "statuses": ["bloodied"]
+        }
+      ]
+    },
+    {
+      "_id": "charBen000000001",
+      "name": "Ben Reed",
+      "type": "character",
+      "ownership": {
+        "default": 0,
+        "playerBen0000001": 3,
+        "playerAda0000001": 2,
+        "gmUser0000000001": 3
+      },
+      "system": {
+        "abilities": {
+          "str": { "value": 8, "proficient": 0 },
+          "dex": { "value": 14, "proficient": 0 },
+          "con": { "value": 12, "proficient": 0 },
+          "int": { "value": 16, "proficient": 1 },
+          "wis": { "value": 13, "proficient": 1 },
+          "cha": { "value": 10, "proficient": 0 }
+        },
+        "skills": { "arc": { "ability": "int", "value": 1 } },
+        "tools": {},
+        "currency": { "pp": 0, "gp": 0, "ep": 0, "sp": 0, "cp": 0 },
+        "spells": {
+          "spell1": { "value": 2, "override": null },
+          "pact": { "value": 0, "override": null }
+        },
+        "attributes": {
+          "ac": {
+            "calcs": ["unarmored", "armored"],
+            "flat": null,
+            "formulas": [],
+            "override": null
+          },
+          "init": { "ability": "" },
+          "movement": { "speeds": { "walk": 30 } },
+          "senses": { "ranges": {} },
+          "hp": { "value": 9, "max": null, "temp": 0, "tempmax": 0, "bonuses": {} },
+          "spellcasting": "int"
+        },
+        "details": {
+          "race": "Human",
+          "background": "",
+          "originalClass": "clsWizard0000001",
+          "xp": { "value": 300 }
+        },
+        "traits": {
+          "size": "med",
+          "languages": { "value": ["common"], "custom": "Old Valley Cant" }
+        }
+      },
+      "items": [
+        {
+          "_id": "clsWizard0000001",
+          "name": "Wizard",
+          "type": "class",
+          "sort": 0,
+          "system": {
+            "identifier": "wizard",
+            "levels": 2,
+            "hd": { "denomination": "d6", "spent": 0 },
+            "spellcasting": { "progression": "full", "ability": "int" },
+            "advancement": [
+              { "_id": "hpW", "type": "HitPoints", "value": { "1": "max", "2": "avg" } }
+            ]
+          }
+        },
+        {
+          "_id": "splFireBolt00001",
+          "name": "Fire Bolt",
+          "type": "spell",
+          "sort": 0,
+          "system": {
+            "level": 0,
+            "school": "evo",
+            "method": "spell",
+            "prepared": 2,
+            "properties": ["vocal", "somatic"],
+            "description": { "value": "<p>A mote of fire, [[/damage 1d10 fire]].</p>" }
+          }
+        },
+        {
+          "_id": "splMissile000001",
+          "name": "Magic Missile",
+          "type": "spell",
+          "sort": 0,
+          "system": {
+            "level": 1,
+            "school": "evo",
+            "method": "spell",
+            "prepared": 1,
+            "properties": ["vocal", "somatic"],
+            "activation": { "type": "action", "value": 1 },
+            "range": { "value": 120, "units": "ft" },
+            "description": { "value": "<p>Three darts of force.</p>" }
+          }
+        },
+        {
+          "_id": "splShield0000001",
+          "name": "Shield",
+          "type": "spell",
+          "sort": 0,
+          "system": {
+            "level": 1,
+            "school": "abj",
+            "method": "spell",
+            "prepared": 0,
+            "description": { "value": "<p>UNPREPARED-SPELL-TEXT</p>" }
+          }
+        }
+      ],
+      "effects": []
+    }
+  ],
+  "scenes": [],
+  "messages": [],
+  "settings": [
+    {
+      "_id": "set1",
+      "key": "fvtt-mod-crystalball.tableNotes",
+      "user": null,
+      "value": "\"Speak like an old sage.\""
+    },
+    { "_id": "set2", "key": "fvtt-mod-crystalball.gmGaze", "user": null, "value": "\"player\"" },
+    {
+      "_id": "set3",
+      "key": "fvtt-mod-crystalball.enabled",
+      "user": "playerAda0000001",
+      "value": "false"
+    },
+    {
+      "_id": "set4",
+      "key": "dnd5e.primaryParty",
+      "user": null,
+      "value": "{\"actor\":\"grpParty00000001\"}"
+    }
+  ],
+  "packs": [],
+  "macros": [],
+  "playlists": [],
+  "tables": [],
+  "cards": [],
+  "combats": []
+}

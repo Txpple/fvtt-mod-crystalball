@@ -1,0 +1,16 @@
+{
+  "comment": "The getJoinData acknowledgement on 14.369 (views/join.mjs handleSocket), trimmed: the users list holds no password. Synthetic.",
+  "release": { "generation": 14, "build": 369 },
+  "world": { "id": "test-world", "title": "Test World" },
+  "modules": [],
+  "passwordString": "••••••••••••",
+  "isAdmin": false,
+  "users": [
+    { "_id": "gmUser0000000001", "name": "Game Master", "role": 4 },
+    { "_id": "playerAda0000001", "name": "Ada", "role": 1 },
+    { "_id": "ballUser00000001", "name": "Crystal Ball", "role": 1 }
+  ],
+  "activeUsers": ["gmUser0000000001"],
+  "userId": null,
+  "options": { "language": "en" }
+}

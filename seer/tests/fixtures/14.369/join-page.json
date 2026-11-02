@@ -1,0 +1,11 @@
+{
+  "comment": "GET /join with no cookie on 14.369: the page (its user list is drawn client-side, so the HTML lists nobody) and a fresh session cookie. Synthetic.",
+  "status": 200,
+  "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "set-cookie": [
+      "session=unjoinedSess0000000000001; Max-Age=86400; Path=/; Expires=Tue, 03 Nov 2026 00:00:00 GMT; HttpOnly; SameSite=Strict"
+    ]
+  },
+  "body": "<!DOCTYPE html><html><head><title>Test World</title></head><body class=\"auth join\"><form id=\"join-game-form\"><select name=\"userId\"></select><input type=\"password\" name=\"password\"><button type=\"submit\" name=\"join\">Join</button></form></body></html>"
+}
