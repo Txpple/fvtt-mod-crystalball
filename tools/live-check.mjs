@@ -3,6 +3,7 @@
 //
 //   FOUNDRY_HOST=local node tools/live-check.mjs                                  # registration, nothing written
 //   FOUNDRY_HOST=local node tools/live-check.mjs --walk [--seer <url>] [--asker Kartor]
+//     [--question "<text>"] [--expect-lookup]
 //
 // Without --walk: the module active, its six world settings registered as the contract names
 // them, the button on the GM page's strip right after Clue Board's (no tab, no action), the
@@ -14,19 +15,29 @@
 // for the run), sends a question with Enter, waits for the ball's answer to finish, checks the
 // stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
 // sitting empties the transcript. The temp user, its ownership and the setting go in `finally`.
+// --question asks something else; --expect-lookup asserts the window showed the rulebook lookup
+// line under the pending turn (a rules question on a real model).
 import { Foundry, foundryConfig, loadEnv } from "fvtt-mcp-dnd5e/client";
+import { DEFAULT_LEAVE_OUT, DEFAULT_RULEBOOKS } from "../scripts/decide/rulebooks.js";
 
 const env = loadEnv();
 const MODULE_ID = "fvtt-mod-crystalball";
 const TEMP_USER = "ZZ-BALL Asker";
-const QUESTION = "What do we know about the Lamp of 1391?";
+const argOf = n => {
+  const i = process.argv.indexOf(`--${n}`);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+const QUESTION = argOf("question") ?? "What do we know about the Lamp of 1391?";
+const expectLookup = process.argv.includes("--expect-lookup");
 const SETTINGS = {
   enabled: { type: "Boolean", default: true },
   serviceUrl: { type: "String", default: "/crystalball" },
   tableNotes: { type: "String", default: "" },
   askers: { type: "String", default: "players", choices: ["players", "listed"] },
   askerIds: { type: "String", default: "" },
-  gmGaze: { type: "String", default: "player", choices: ["player", "all"] }
+  gmGaze: { type: "String", default: "player", choices: ["player", "all"] },
+  rulebooks: { type: "String", default: DEFAULT_RULEBOOKS },
+  rulebookLeaveOut: { type: "String", default: DEFAULT_LEAVE_OUT }
 };
 
 const arg = n => {
@@ -59,10 +70,10 @@ function watch(f, label, sink) {
 
 let cleanup = async () => {};
 setTimeout(async () => {
-  console.error("[crystalball] WATCHDOG: 120s elapsed, cleaning up and aborting");
+  console.error("[crystalball] WATCHDOG: 300s elapsed, cleaning up and aborting");
   await cleanup().catch(() => {});
   process.exit(3);
-}, 120_000).unref();
+}, 300_000).unref();
 
 const lines = [];
 const f = new Foundry(foundryConfig(env));
@@ -315,10 +326,14 @@ try {
         // The send redraws before it streams: wait for the new turn, then for it to finish.
         const started = await until(() => balls().length > ballsBefore, 5_000);
         const t0 = Date.now();
+        // Every rulebook line the pending turn shows while the ball looks things up.
+        const looked = [];
         const finished = await until(() => {
           const last = balls().length > ballsBefore ? balls().pop() : null;
+          const line = last?.querySelector(".crystalball-looking")?.textContent?.trim();
+          if (line && looked.at(-1) !== line) looked.push(line);
           return last && !last.classList.contains("pending") ? last : null;
-        }, 60_000);
+        }, 200_000);
         const ms = Date.now() - t0;
         // The text with each drawn <br> read as the newline it was.
         const textOf = node => {
@@ -363,6 +378,7 @@ try {
           usageBefore,
           usageAfter,
           draftCleared,
+          looked,
           emptied: !!emptied,
           currentTurns: Array.isArray(current?.turns) ? current.turns.length : null
         };
@@ -384,6 +400,10 @@ try {
       assert(C.answer.length > 0, `the answer is not empty: "${C.answer.slice(0, 160)}"`);
       assert(C.userTurn === QUESTION, "the player's turn shows the question as typed");
       assert(C.draftCleared, "the input emptied on send");
+      console.log(`  the lookup lines shown: ${C.looked.length ? C.looked.map(l => `"${l}"`).join(", ") : "none"}`);
+      if (expectLookup) assert(C.looked.length > 0, "the window showed the ball looking in the rulebooks");
+      if (health.model !== "stub") console.log(`  the answer:
+${C.answer.replace(/^/gm, "    ")}`);
       if (health.model === "stub") {
         const m =
           /The Crystal Ball is clouded \(stub\)\. I see (\d+) shared pages, (\d+) clues, (\d+) party members\s+and your character (.+?) \((.+?)\)\. You asked: "(.*)"\./s.exec(
