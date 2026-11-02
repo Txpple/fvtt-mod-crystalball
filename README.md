@@ -68,7 +68,6 @@ module.json                    the Foundry manifest
 scripts/
   crystalball.js               the entry point: settings, the button, the probe, the API
   window.js                    the Crystal Ball window
-  host.js                      where what the window opens appears (Card Catalogue's copy)
   common.js                    the id, the logger, the strings, the settings
   decide/                      pure rules, no Foundry: sse.js, markdown.js, session.js
   kit/                         the Open Roll 5e kit: elect.js, receipt.js, log.js, the same
@@ -79,6 +78,7 @@ seer/                          the Seer: src/, tests/, config.json, deploy/, REA
 docs/seer-contract.md          the contract between the window and the Seer
 tools/
   live-check.mjs               the sandbox walk (a GM page, a temporary player, a sitting)
+  fake-seer.mjs                a stub-only stand-in for the Seer, for the walk alone; never deployed
   ball-user.mjs                makes or resets the ball's user on a sandbox
 ```
 

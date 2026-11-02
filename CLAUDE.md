@@ -38,8 +38,9 @@ in `seer/.env`.
   none listened to.
 - **Limits live in the Seer** (per user per hour and day, the table's day and month in dollars, the message length,
   the sitting window, the gaze budget) and the window only reports them; a cap answers 429 with its scope.
-- **Card Catalogue's look, a copy kept by hand** (the `--cb-*` palette under `crystalball-` classes) and its
-  `host.js` byte-identical with Clue Board's: a change to one is made in all three.
+- **Card Catalogue's look, a copy kept by hand** (the `--cb-*` palette under `crystalball-` classes): a change to
+  either module's look is made in both. No `host.js`: the window opens nothing of its own, and the copied helper,
+  which notes its host on every keystroke, pulled unrelated sheets into a detached ball (found in review).
 - **What the ball says is a Markdown subset over escaped text** (`scripts/decide/markdown.js`): never raw HTML,
   never `enrichHTML`.
 - **The sidebar never changes**: a button on the strip, no `data-tab`, nothing on `Sidebar.TABS` (Clue Board's
@@ -52,12 +53,15 @@ in `seer/.env`.
   probe at `ready`, `module.api = { open, newSitting }`.
 - `scripts/window.js`: `CrystalBallWindow` (ApplicationV2 + Handlebars, one per client): the status bar, the
   transcript, the input, the stream.
-- `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `session.js` (the cookie and
-  the base URL); pure, `// @ts-check`, tested in `tests/`.
-- `scripts/host.js`, `scripts/common.js`, `scripts/kit/`.
+- `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `session.js` (the session id,
+  the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
+- `scripts/common.js`, `scripts/kit/`.
 - `seer/src/`: `main.js`, `foundry.js` (join, the ball's socket, the probe, the world), `permission.js`, `gaze.js`,
   `sheet.js`, `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js`, `log.js`;
   `seer/config.json` the defaults; `seer/tests/` with synthetic fixtures under `fixtures/<foundry version>/`;
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.
 - `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--asker <member>`);
-  `tools/ball-user.mjs`: the ball's user on a sandbox.
+  `tools/fake-seer.mjs`: a stub-only stand-in Seer for the walk, never deployed; `tools/ball-user.mjs`: the ball's
+  user on a sandbox.
+- **Identity in the window**: `game.socket.session.sessionId` first (Foundry 14's session cookie is HttpOnly), the
+  cookie only for an older build; the walk asserts the two are equal.
