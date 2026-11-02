@@ -24,7 +24,9 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
   ownership rule: the journal pages every player can observe; the party (its members, its stash, and every clue
   and thread on its Clue Board when Clue Board is installed); then the pages only this player can observe and each
   character they own, as a curated sheet. The DM's *Table notes* setting is read to the ball first. A GM's gaze is
-  a player's by default, so the DM sees what the players get.
+  a player's by default, so the DM sees what the players get. **Ownership decides the lore**: a journal entry or
+  page players can observe is what the ball knows, so the DM chooses what it reads by setting ownership, as for
+  the players themselves.
 - **Who is asking.** The window sends the player's own Foundry session with every request, and the Seer asks
   Foundry whose it is. A stranger on the internet has no session; a player cannot pretend to be another.
 - **What it costs.** The gaze is cached in layers shared across the party, so a sitting's later messages cost a

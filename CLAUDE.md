@@ -29,6 +29,17 @@ in `seer/.env`.
   role, so the role buys no reading; a GM-level socket that runs no modules would be elected the table's active GM
   while the DM is away and By the Books' consequences would land on it and die. The Seer writes nothing to
   Foundry: its socket emits `world` and nothing else.
+- **The join, as 14.369 has it** (read from the build): the ball's user id comes from `getJoinData` on a socket
+  holding the fresh cookie a plain GET of `/join` hands out (the page lists no users; a GET of `/join` with a
+  session cookie logs that session out, so the Seer never sends one); `POST /join` names Foundry's own `Origin`
+  (and `Sec-Fetch-Site: same-origin`) or Foundry answers 400; sessions last 24 hours, the Seer resumes on its
+  cookie after a drop and rejoins when Foundry has forgotten it. A build that reshapes any of this fails the
+  fixtures under `seer/tests/fixtures/<version>/` before a live socket hangs.
+- **What the lore holds is the DM's ownership, nothing else.** A journal entry or page at `default ≥ 2` is every
+  player's lore (on this world the Bestiary and the four backstories are, as measured); a secret block shows in the
+  shared lore only when every player owns the page, and in a player's own layer when they do. Sheet numbers (hit
+  point max, AC, skills, slots, initiative) are worked out from the source data with numeric effect changes applied
+  and marked so; unidentified items show their unidentified face; unprepared spells are named, not described.
 - **The gaze is the Seer's, from the live world, never the client's.** Four layers in a fixed, deterministic order
   (instructions and the DM's table notes; the lore every player can observe; the party with its stash and Clue
   Board record; the player's own pages and curated sheets), the permission rule mirroring `testUserPermission` at
@@ -56,8 +67,10 @@ in `seer/.env`.
 - `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `session.js` (the session id,
   the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
 - `scripts/common.js`, `scripts/kit/`.
-- `seer/src/`: `main.js`, `foundry.js` (join, the ball's socket, the probe, the world), `permission.js`, `gaze.js`,
-  `sheet.js`, `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js`, `log.js`;
+- `seer/src/`: `main.js`, `foundry.js` (join, the ball's socket, the probe, the world), `settings.js` (the module's
+  world settings off the payload, user-scoped rows ignored, the module's active check), `permission.js`,
+  `gaze.js`, `markdown.js` (the enrichers and turndown), `labels.js` (dnd5e's key-to-label maps), `sheet.js`,
+  `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (versioned), `log.js`;
   `seer/config.json` the defaults; `seer/tests/` with synthetic fixtures under `fixtures/<foundry version>/`;
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.
 - `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--asker <member>`);
