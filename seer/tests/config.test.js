@@ -21,7 +21,7 @@ describe("the committed config", () => {
   it("holds the contract's defaults", () => {
     expect(loadConfig(DEFAULTS_FILE)).toEqual({
       model: "claude-opus-5-5",
-      effort: "low",
+      effort: "medium",
       maxOutputTokens: 2048,
       cacheTtl: "5m",
       refusalFallback: true,

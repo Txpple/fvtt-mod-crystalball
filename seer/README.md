@@ -50,7 +50,7 @@ sentence, which names what the gaze holds, so a live check can assert on it for 
 
 ## The model call
 
-`claude-opus-5-5` by default (`claude-sonnet-5-5` the other choice in `config.json`), `output_config.effort` low,
+`claude-opus-5-5` by default (`claude-sonnet-5-5` the other choice in `config.json`), `output_config.effort` medium,
 2,048 output tokens, no `thinking` parameter, streamed. The four layers are the system prompt: an explicit
 `cache_control` marker on the first three and the request's top-level automatic marker for the conversation, so a
 sitting's next message reads the cached gaze and history. With `refusalFallback` on, the call goes through the

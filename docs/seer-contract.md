@@ -124,7 +124,7 @@ never written to disk.
 
 `@anthropic-ai/sdk`, `client.messages.stream(...)`: `model` from config (`claude-opus-5-5` default,
 `claude-sonnet-5-5` the other), no `thinking` parameter (adaptive is the model's default), `output_config:
-{ effort: config.effort }` (`low` default), `max_tokens: config.maxOutputTokens` (2048), `betas:
+{ effort: config.effort }` (`medium` default), `max_tokens: config.maxOutputTokens` (2048), `betas:
 ["server-side-fallback-2026-07-01"]` with `fallbacks: "default"` through the beta client when
 `config.refusalFallback` is true (default true). The response `usage` fields `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens` make the ledger line, priced by
