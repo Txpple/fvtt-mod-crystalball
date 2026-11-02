@@ -13,13 +13,16 @@ to this file; a change to it is made here first. The plan is `../../docs/plans/c
 ## Transport
 
 The window talks to the Seer over HTTP at `serviceUrl` (a world setting). Every request carries
-`X-Foundry-Session: <the value of the player's "session" cookie>` (the client reads it from `document.cookie`
-exactly as Foundry's own `Game.getCookies()` does). No other authentication. No cookies are relied on.
+`X-Foundry-Session: <the player's session id>`: the id Foundry handed the client's own socket at connect,
+`game.socket.session.sessionId` (Foundry 14 sets the `session` cookie HttpOnly, so `document.cookie` never shows
+it; the client reads the cookie first for older builds and falls back to the socket's copy; the two are the same
+value). No other authentication. No cookies are relied on.
 
 - prod: `serviceUrl` is the same-origin path `/crystalball` (the tunnel routes it to the Seer; no CORS).
-- sandbox: `serviceUrl` is `http://localhost:30001`; the Seer answers CORS for the one `CORS_ORIGIN`
-  (preflight `OPTIONS`, `Access-Control-Allow-Origin: <origin>`, `Access-Control-Allow-Headers:
-  Content-Type, X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`).
+- sandbox: `serviceUrl` is `http://localhost:30001/crystalball` (the Seer's origin plus its `BASE_PATH`, the same
+  path on both so the two differ only by origin); the Seer answers CORS for the one `CORS_ORIGIN` (preflight
+  `OPTIONS`, `Access-Control-Allow-Origin: <origin>`, `Access-Control-Allow-Headers: Content-Type,
+  X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`).
 
 All responses are JSON (`application/json`) except `POST chat`, which is `text/event-stream`.
 

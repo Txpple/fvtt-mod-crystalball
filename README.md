@@ -55,7 +55,7 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Enabled | on | Off hides the button and the Seer answers no one. |
-| Service URL | `/crystalball` | Where the window calls the Seer: a path on Foundry's own origin (prod, behind a tunnel rule) or a full URL (a sandbox on a second port). |
+| Service URL | `/crystalball` | Where the window calls the Seer: a path on Foundry's own origin (prod, behind a tunnel rule) or a full URL with the same path (a sandbox: `http://localhost:30001/crystalball`). |
 | Table notes | empty | The DM's standing notes to the ball: its manner, what to decline, house facts. Read before anything else. |
 | Who may ask | every player | Every user, or only the listed user ids. |
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |

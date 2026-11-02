@@ -1,0 +1,47 @@
+<div class="crystalball-body{{#if dark}} is-dark{{/if}}{{#if loading}} is-loading{{/if}}">
+<header class="crystalball-bar">
+    <span class="crystalball-orb" aria-hidden="true"></span>
+    <span class="crystalball-model">{{ model }}</span>
+    {{#if count}}<span class="crystalball-count">{{ count }}</span>{{/if}}
+    <span class="crystalball-spacer"></span>
+    {{#if dark}}
+    <button type="button" class="crystalball-btn" data-action="retry">
+        <i class="fa-solid fa-rotate-right" inert></i> {{ localize "fvtt-mod-crystalball.retry" }}
+    </button>
+    {{/if}}
+    <button type="button" class="crystalball-btn" data-action="newSitting" data-tooltip="{{ localize "fvtt-mod-crystalball.newSittingHint" }}" {{#if newOff}}disabled{{/if}}>
+        <i class="fa-solid fa-sparkles" inert></i> {{ localize "fvtt-mod-crystalball.newSitting" }}
+    </button>
+</header>
+
+<section class="crystalball-transcript" aria-live="polite">
+    {{#if intro}}
+    <p class="crystalball-intro">{{ localize "fvtt-mod-crystalball.intro" }}</p>
+    {{/if}}
+    {{#each turns}}
+    <article class="crystalball-turn {{#if user}}user{{else}}ball{{/if}}{{#if pending}} pending{{/if}}">
+        <span class="crystalball-who">{{ who }}</span>
+        {{#if user}}
+        <div class="crystalball-text">{{ text }}</div>
+        {{else}}
+        <div class="crystalball-text">{{{ html }}}</div>
+        {{/if}}
+        {{#if error}}<p class="crystalball-error">{{ error }}</p>{{/if}}
+    </article>
+    {{/each}}
+    {{#if dark}}
+    <p class="crystalball-dark"><i class="fa-solid fa-moon" inert></i> {{ darkLine }}</p>
+    {{/if}}
+</section>
+
+<footer class="crystalball-input">
+    <textarea name="message" rows="3" placeholder="{{ localize "fvtt-mod-crystalball.input.placeholder" }}" aria-label="{{ localize "fvtt-mod-crystalball.input.label" }}" {{#if inputOff}}disabled{{/if}}>{{ draft }}</textarea>
+    <div class="crystalball-input-row">
+        <span class="crystalball-counter{{#if over}} over{{/if}}">{{ counter }}</span>
+        <span class="crystalball-hint">{{ localize "fvtt-mod-crystalball.input.hint" }}</span>
+        <button type="button" class="crystalball-btn pri" data-action="send" {{#if sendOff}}disabled{{/if}}>
+            <i class="fa-solid fa-paper-plane" inert></i> {{ localize "fvtt-mod-crystalball.send" }}
+        </button>
+    </div>
+</footer>
+</div>

@@ -1,0 +1,406 @@
+/*
+ * Crystal Ball: the window. Scoped to the module's own classes; no bare element or dnd5e class
+ * selector, so nothing else is touched. The look is Card Catalogue's (its palette copied as
+ * `--cb-*`, its bar and buttons), copied by hand as Clue Board's is, so the three read as one
+ * family; dark in Foundry's light theme too.
+ */
+
+/* The `ready` hook appends one of these, reads its computed flex-direction and removes it: the
+   one honest way to ask whether this sheet reached the cascade (v14 bundles module CSS). */
+.crystalball-css-probe {
+  display: none;
+  flex-direction: column;
+}
+
+.crystalball {
+  --cb-ground: #1e1b18;
+  --cb-panel: #26221e;
+  --cb-card: #2b2723;
+  --cb-line: #3d3a35;
+  --cb-ink: #ece6d8;
+  --cb-ink-2: #c9c3b6;
+  --cb-ink-3: #a39d90;
+  --cb-gold: #c9a24a;
+  --cb-gold-ink: #1b1813;
+  --cb-green: #62ad72;
+  --cb-red: #e7a89c;
+  --cb-blue: #9cc7e8;
+  --cb-deep: #1d2a4a;
+}
+
+.crystalball .window-content {
+  padding: 0;
+  background: var(--cb-ground);
+  color: var(--cb-ink);
+  overflow: hidden;
+}
+
+.crystalball-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: var(--font-size-13, 0.8125rem);
+}
+
+/* -------------------------------------------------- */
+/*  The buttons                                        */
+/* -------------------------------------------------- */
+
+.crystalball-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex: none;
+  width: auto;
+  height: auto;
+  min-height: 1.85rem;
+  margin: 0;
+  padding: 0.2rem 0.65rem;
+  background: #2f3238;
+  border: 1px solid var(--cb-line);
+  border-radius: 4px;
+  color: var(--cb-ink);
+  font-family: inherit;
+  font-size: var(--font-size-12, 0.75rem);
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.crystalball-btn:hover:not(:disabled) {
+  border-color: #8a7a55;
+  color: var(--cb-ink);
+}
+
+.crystalball-btn.pri {
+  background: var(--cb-gold);
+  border-color: var(--cb-gold);
+  color: var(--cb-gold-ink);
+  font-weight: 700;
+}
+
+.crystalball-btn.pri:hover:not(:disabled) {
+  background: #e0b95c;
+}
+
+.crystalball-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.crystalball-btn:focus-visible {
+  outline: 2px solid var(--cb-gold);
+  outline-offset: 1px;
+}
+
+/* -------------------------------------------------- */
+/*  The bar: the model, the count, New sitting         */
+/* -------------------------------------------------- */
+
+.crystalball-bar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--cb-line);
+}
+
+/* The ball itself, small: gold and glowing while it answers, grey when dark. */
+.crystalball-orb {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fff3c9 0%,
+    var(--cb-gold) 45%,
+    var(--cb-deep) 100%
+  );
+  box-shadow: 0 0 6px rgba(201, 162, 74, 0.6);
+}
+
+.crystalball-body.is-loading .crystalball-orb {
+  animation: crystalball-glow 1.4s ease-in-out infinite;
+}
+
+.crystalball-body.is-dark .crystalball-orb {
+  background: radial-gradient(circle at 35% 30%, #6d6a64 0%, #3d3a35 60%, #1e1b18 100%);
+  box-shadow: none;
+}
+
+.crystalball-model {
+  font-family: var(--font-sans-condensed, "Roboto Condensed", sans-serif);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cb-gold);
+}
+
+.crystalball-body.is-dark .crystalball-model {
+  color: var(--cb-ink-3);
+}
+
+.crystalball-count {
+  padding: 0.05rem 0.55rem;
+  background: var(--cb-panel);
+  border: 1px solid var(--cb-line);
+  border-radius: 1rem;
+  color: var(--cb-ink-2);
+  font-size: var(--font-size-12, 0.75rem);
+  line-height: 1.4;
+}
+
+.crystalball-spacer {
+  flex: 1;
+}
+
+/* -------------------------------------------------- */
+/*  The transcript                                     */
+/* -------------------------------------------------- */
+
+.crystalball-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.85rem 1rem;
+}
+
+.crystalball-intro,
+.crystalball-dark {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--cb-gold);
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cb-ink-2);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.crystalball-dark {
+  border-left-color: var(--cb-ink-3);
+}
+
+.crystalball-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 88%;
+  padding: 0.5rem 0.75rem 0.6rem;
+  border: 1px solid var(--cb-line);
+  border-radius: 6px;
+  line-height: 1.55;
+}
+
+.crystalball-turn.user {
+  align-self: flex-end;
+  background: var(--cb-panel);
+}
+
+.crystalball-turn.ball {
+  align-self: flex-start;
+  background:
+    linear-gradient(180deg, rgba(29, 42, 74, 0.45), rgba(29, 42, 74, 0.15)), var(--cb-card);
+  border-color: #3a4560;
+}
+
+.crystalball-who {
+  font-family: var(--font-sans-condensed, "Roboto Condensed", sans-serif);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cb-ink-3);
+}
+
+.crystalball-turn.ball .crystalball-who {
+  color: var(--cb-gold);
+}
+
+.crystalball-turn.user .crystalball-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.crystalball-turn.ball .crystalball-text {
+  overflow-wrap: anywhere;
+}
+
+.crystalball-text :is(p, ul, ol) {
+  margin: 0 0 0.55rem;
+}
+
+.crystalball-text > :last-child {
+  margin-bottom: 0;
+}
+
+.crystalball-text :is(ul, ol) {
+  padding-left: 1.3rem;
+}
+
+.crystalball-text li + li {
+  margin-top: 0.15rem;
+}
+
+.crystalball-text :is(h3, h4, h5) {
+  margin: 0.6rem 0 0.35rem;
+  padding: 0;
+  border: 0;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--cb-ink);
+}
+
+.crystalball-text h3 {
+  font-size: 1.05rem;
+}
+
+.crystalball-text h4 {
+  font-size: 0.95rem;
+}
+
+.crystalball-text h5 {
+  font-size: 0.85rem;
+  color: var(--cb-ink-2);
+}
+
+.crystalball-text :is(h3, h4, h5):first-child {
+  margin-top: 0;
+}
+
+.crystalball-text code {
+  padding: 0 0.25rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--cb-line);
+  border-radius: 3px;
+  color: var(--cb-ink);
+  font-size: 0.85em;
+}
+
+.crystalball-text strong {
+  color: var(--cb-ink);
+}
+
+/* The ball gazing, before its first word arrives. */
+.crystalball-turn.pending .crystalball-text:empty::after {
+  content: "\2022\2022\2022";
+  letter-spacing: 0.25em;
+  color: var(--cb-gold);
+  animation: crystalball-glow 1.4s ease-in-out infinite;
+}
+
+.crystalball-error {
+  margin: 0.15rem 0 0;
+  color: var(--cb-red);
+  font-size: var(--font-size-12, 0.75rem);
+  font-style: italic;
+}
+
+@keyframes crystalball-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* -------------------------------------------------- */
+/*  The input                                          */
+/* -------------------------------------------------- */
+
+.crystalball-input {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem 0.7rem;
+  border-top: 1px solid var(--cb-line);
+  background: var(--cb-panel);
+}
+
+.crystalball-input textarea {
+  width: 100%;
+  min-height: 4.2rem;
+  max-height: 40vh;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  background: var(--cb-ground);
+  border: 1px solid var(--cb-line);
+  border-radius: 4px;
+  color: var(--cb-ink);
+  font-family: inherit;
+  font-size: var(--font-size-13, 0.8125rem);
+  line-height: 1.45;
+  resize: vertical;
+  box-shadow: none;
+}
+
+.crystalball-input textarea::placeholder {
+  color: var(--cb-ink-3);
+}
+
+.crystalball-input textarea:focus {
+  border-color: var(--cb-gold);
+  box-shadow: none;
+  outline: none;
+}
+
+.crystalball-input textarea:disabled {
+  opacity: 0.5;
+}
+
+.crystalball-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.crystalball-counter {
+  flex: none;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--cb-ink-3);
+}
+
+.crystalball-counter.over {
+  color: var(--cb-red);
+  font-weight: 700;
+}
+
+.crystalball-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.72rem;
+  color: var(--cb-ink-3);
+}
+
+/* -------------------------------------------------- */
+/*  The sidebar button                                 */
+/* -------------------------------------------------- */
+
+/* Its painted picture, only while Card Catalogue paints the other tabs (its class on the body):
+   the glyph's ::before carries the picture, its URL the button's variable. */
+body.cardcatalogue-tab-icons #sidebar-tabs .crystalball-tab-icon {
+  position: relative;
+}
+
+body.cardcatalogue-tab-icons #sidebar-tabs .crystalball-tab-icon::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  background: var(--crystalball-tab-icon) center / contain no-repeat;
+}

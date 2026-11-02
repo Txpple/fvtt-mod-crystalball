@@ -9,7 +9,8 @@
       "!.claude",
       "!package-lock.json",
       "!prototypes",
-      "!module.json"
+      "!module.json",
+      "!**/*.md"
     ]
   },
   "assist": { "enabled": false },

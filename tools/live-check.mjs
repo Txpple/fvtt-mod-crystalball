@@ -1,0 +1,423 @@
+// The live check on a real world (the local sandbox), Clue Board's in shape: a GM page (the bridge
+// user) and a temporary player page, every fact read from the world and from the Seer.
+//
+//   FOUNDRY_HOST=local node tools/live-check.mjs                                  # registration, nothing written
+//   FOUNDRY_HOST=local node tools/live-check.mjs --walk [--seer <url>] [--asker Kartor]
+//
+// Without --walk: the module active, its six world settings registered as the contract names
+// them, the button on the GM page's strip right after Clue Board's (no tab, no action), the
+// window it opens centred, and dark when no Seer answers at the Service URL.
+//
+// With --walk: a temporary player (assigned the --asker member's character and Owner on it for
+// the run) opens the window against the Seer at --seer (the Service URL setting is pointed there
+// for the run), sends a question with Enter, waits for the ball's answer to finish, checks the
+// stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
+// sitting empties the transcript. The temp user, its ownership and the setting go in `finally`.
+import { Foundry, foundryConfig, loadEnv } from "fvtt-mcp-dnd5e/client";
+
+const env = loadEnv();
+const MODULE_ID = "fvtt-mod-crystalball";
+const TEMP_USER = "ZZ-BALL Asker";
+const QUESTION = "What do we know about the Lamp of 1391?";
+const SETTINGS = {
+  enabled: { type: "Boolean", default: true },
+  serviceUrl: { type: "String", default: "/crystalball" },
+  tableNotes: { type: "String", default: "" },
+  askers: { type: "String", default: "players", choices: ["players", "listed"] },
+  askerIds: { type: "String", default: "" },
+  gmGaze: { type: "String", default: "player", choices: ["player", "all"] }
+};
+
+const arg = n => {
+  const i = process.argv.indexOf(`--${n}`);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+const walk = process.argv.includes("--walk");
+const seerUrl = (arg("seer") ?? "http://localhost:30001").replace(/\/+$/, "");
+const askerName = arg("asker") ?? "Kartor";
+
+let fails = 0;
+const assert = (cond, msg) => {
+  console.log(`  ${cond ? "PASS" : "FAIL"}  ${msg}`);
+  if (!cond) fails++;
+};
+/** Console lines the pages print that name the module, or any error or warning at all. */
+function watch(f, label, sink) {
+  const page = f.page;
+  if (!page) return;
+  page.on("console", msg => {
+    const text = msg.text();
+    const type = msg.type();
+    if (type === "error" || type === "warning" || /crystal ?ball/i.test(text)) sink.push(`[${label} ${type}] ${text}`);
+  });
+  page.on("pageerror", err => sink.push(`[${label} pageerror] ${err?.message ?? err}`));
+  page.on("response", res => {
+    if (res.status() >= 400) sink.push(`[${label} http ${res.status()}] ${res.url()}`);
+  });
+}
+
+let cleanup = async () => {};
+setTimeout(async () => {
+  console.error("[crystalball] WATCHDOG: 120s elapsed, cleaning up and aborting");
+  await cleanup().catch(() => {});
+  process.exit(3);
+}, 120_000).unref();
+
+const lines = [];
+const f = new Foundry(foundryConfig(env));
+console.log("[crystalball] connecting as the GM…");
+await f.connect();
+watch(f, "gm", lines);
+
+let temp = null;
+let fp = null;
+/** The Service URL before the run, once the walk has changed it. */
+let priorUrl = null;
+/** The one cleanup, run by `finally` or by the watchdog, whichever comes first. */
+cleanup = async () => {
+  cleanup = async () => {};
+  if (fp) await fp.disconnect?.().catch(() => {});
+  if (temp?.userId || priorUrl !== null) {
+    await f
+      .evaluate(
+        async ({ id, actorId, userId, had, priorUrl }) => {
+          if (priorUrl !== null) await game.settings.set(id, "serviceUrl", priorUrl);
+          if (userId) {
+            const actor = game.actors.get(actorId);
+            if (actor) {
+              // The whole map, replaced: a deletion operator inside ownership fails its validation
+              // on v14, and a key left for a deleted user is litter on the actor.
+              const ownership = { ...actor.ownership };
+              if (had === null) delete ownership[userId];
+              else ownership[userId] = had;
+              await actor.update({ ownership }, { recursive: false, diff: false });
+            }
+            await game.users.get(userId)?.delete();
+          }
+        },
+        { id: MODULE_ID, actorId: temp?.actorId ?? null, userId: temp?.userId ?? null, had: temp?.had ?? null, priorUrl }
+      )
+      .catch(err => console.log(`  cleanup: ${err?.message ?? err}`));
+  }
+  await f.disconnect?.().catch(() => {});
+};
+
+try {
+  // --- A. registration --------------------------------------------------------------------
+  console.log("# A. registration");
+  const A = await f.evaluate(
+    async ({ id, settings }) => {
+      const m = game.modules.get(id);
+      const strip = [...document.querySelectorAll("#sidebar nav.tabs menu > li > button")];
+      const button = document.getElementById("crystalball-button");
+      const at = strip.indexOf(button);
+      const before = at > 0 ? strip[at - 1] : null;
+      const registered = {};
+      for (const key of Object.keys(settings)) {
+        const s = game.settings.settings.get(`${id}.${key}`);
+        registered[key] = s
+          ? {
+              scope: s.scope,
+              config: s.config,
+              type: s.type?.name ?? s.type?.constructor?.name ?? null,
+              default: s.default,
+              choices: s.choices ? Object.keys(s.choices) : null
+            }
+          : null;
+      }
+      const probe = document.createElement("div");
+      probe.className = "crystalball-css-probe";
+      document.body.append(probe);
+      const css = getComputedStyle(probe).flexDirection === "column";
+      probe.remove();
+      const iconVar = button?.style.getPropertyValue("--crystalball-tab-icon") ?? "";
+      const iconUrl = /url\("?([^")]+)"?\)/.exec(iconVar)?.[1] ?? null;
+      const iconStatus = iconUrl ? (await fetch(iconUrl)).status : null;
+
+      const serviceUrl = game.settings.get(id, "serviceUrl");
+      const tab = ui.sidebar.tabGroups.primary;
+      const expanded = ui.sidebar.expanded;
+      button?.click();
+      let win = null;
+      for (let i = 0; i < 100; i++) {
+        win = foundry.applications.instances.get("crystalball-window");
+        const settled = win?.element?.querySelector(".crystalball-body:not(.is-loading)");
+        if (settled) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      const el = win?.element;
+      const rect = el?.getBoundingClientRect();
+      const centred = rect ? Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < window.innerWidth * 0.15 : false;
+      const state = {
+        dark: !!el?.querySelector(".crystalball-body.is-dark"),
+        darkLine: el?.querySelector(".crystalball-dark")?.textContent?.trim() ?? null,
+        retry: !!el?.querySelector('[data-action="retry"]'),
+        inputOff: !!el?.querySelector("textarea[name=message]")?.disabled,
+        model: el?.querySelector(".crystalball-model")?.textContent?.trim() ?? null,
+        title: win?.title ?? null
+      };
+      await win?.close();
+      return {
+        installed: !!m,
+        active: !!m?.active,
+        version: m?.version,
+        api: typeof m?.api?.open === "function" && typeof m?.api?.newSitting === "function",
+        registered,
+        css,
+        button: !!button,
+        buttonClass: button?.className ?? null,
+        tooltip: button?.dataset.tooltip ?? null,
+        label: button?.getAttribute("aria-label") ?? null,
+        noTab: !!button && !button.dataset.tab && !button.dataset.action,
+        before: before ? before.id || before.dataset.tab || before.className : null,
+        clueboardActive: !!game.modules.get("fvtt-mod-clueboard")?.active,
+        iconUrl,
+        iconStatus,
+        cardcatalogueIcons: document.body.classList.contains("cardcatalogue-tab-icons"),
+        opened: !!win,
+        centred,
+        sidebarStill: ui.sidebar.tabGroups.primary === tab && ui.sidebar.expanded === expanded,
+        serviceUrl,
+        state,
+        isGM: game.user.isGM,
+        user: game.user.name
+      };
+    },
+    { id: MODULE_ID, settings: SETTINGS }
+  );
+  console.log(`  bridge user ${A.user} (GM=${A.isGM}); module ${A.installed ? `v${A.version} active=${A.active}` : "NOT INSTALLED"}`);
+  assert(A.active, "the module is active");
+  if (!A.active) throw new Error("module not active; register and enable it, then restart the world");
+  assert(A.api, "the API is on the module (open, newSitting)");
+  for (const [key, want] of Object.entries(SETTINGS)) {
+    const got = A.registered[key];
+    const ok =
+      !!got &&
+      got.scope === "world" &&
+      got.config === true &&
+      got.default === want.default &&
+      (!want.choices || JSON.stringify(got.choices) === JSON.stringify(want.choices));
+    assert(ok, `the setting ${key} is registered: world, config, default ${JSON.stringify(want.default)}${want.choices ? `, choices ${want.choices.join("/")}` : ""} (${JSON.stringify(got)})`);
+  }
+  assert(A.css, "the stylesheet reached the cascade");
+  assert(A.button && /fa-crystal-ball/.test(A.buttonClass), `the button is on the strip with the crystal ball glyph (${A.buttonClass})`);
+  assert(A.label === "Crystal Ball" && A.tooltip === "Crystal Ball", `its aria-label and tooltip say Crystal Ball (${A.label} / ${A.tooltip})`);
+  assert(A.noTab, "the button is no tab: no data-tab, no data-action");
+  if (A.clueboardActive) assert(A.before === "clueboard-mysteries-button", `the button sits right after Clue Board's (after "${A.before}")`);
+  else assert(A.before === "journal", `Clue Board is off: the button sits right after Journal (after "${A.before}")`);
+  assert(A.iconStatus === 200, `the painted picture is served (${A.iconUrl} → ${A.iconStatus}; Card Catalogue's icons ${A.cardcatalogueIcons ? "on" : "off"})`);
+  assert(A.opened && A.centred, "the button opens the window, centred");
+  assert(A.state.title === "Crystal Ball", `the window is titled Crystal Ball (${A.state.title})`);
+  assert(A.sidebarStill, "the click left the sidebar's tab and its expansion as they were");
+  console.log(`  Service URL: ${A.serviceUrl}; the window: model "${A.state.model}", dark=${A.state.dark}`);
+  if (A.serviceUrl === "/crystalball") {
+    // No tunnel on the sandbox: Foundry itself answers /crystalball/healthz with a 404.
+    assert(A.state.dark && A.state.retry && A.state.inputOff, `with no Seer at the default path the ball is dark, the input off, Retry offered ("${A.state.darkLine}")`);
+  }
+
+  if (walk) {
+    // --- B. a temporary player, the asker ------------------------------------------------
+    console.log(`# B. a temporary player (${askerName}), the Seer at ${seerUrl}`);
+    const health = await fetch(`${seerUrl}/healthz`)
+      .then(r => r.json())
+      .catch(err => ({ error: err?.message ?? String(err) }));
+    console.log(`  healthz: ${JSON.stringify(health)}`);
+    assert(!health.error && health.foundry?.connected && health.foundry?.worldOpen, "the Seer answers healthz, linked to an open world");
+    if (health.error) throw new Error(`no Seer at ${seerUrl}`);
+
+    temp = await f.evaluate(
+      async ({ id, userName, askerName, seerUrl }) => {
+        const asker = game.actors.find(a => a.type === "character" && a.name.startsWith(askerName));
+        if (!asker) return { error: `no character named ${askerName}` };
+        const party = game.actors.find(a => a.type === "group" && Array.from(a.system.members ?? []).some(m => m.actor?.id === asker.id));
+        const user =
+          game.users.find(u => u.name === userName) ??
+          (await User.implementation.create({ name: userName, role: CONST.USER_ROLES.PLAYER, character: asker.id }));
+        if (user.character?.id !== asker.id) await user.update({ character: asker.id });
+        const had = asker.ownership[user.id] ?? null;
+        await asker.update({ [`ownership.${user.id}`]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER });
+        const priorUrl = game.settings.get(id, "serviceUrl");
+        await game.settings.set(id, "serviceUrl", seerUrl);
+        return {
+          userId: user.id,
+          actorId: asker.id,
+          actorName: asker.name,
+          had,
+          priorUrl,
+          party: party?.name ?? null,
+          partyClues: party ? Object.keys(party.flags?.["fvtt-mod-clueboard"]?.entries ?? {}).length : 0,
+          partyMembers: party ? Array.from(party.system.members ?? []).filter(m => m.actor).length : 0,
+          classLevel: Object.values(asker.classes ?? {})
+            .map(c => `${c.name} ${c.system.levels}`)
+            .join(" / "),
+          askers: game.settings.get(id, "askers"),
+          enabled: game.settings.get(id, "enabled")
+        };
+      },
+      { id: MODULE_ID, userName: TEMP_USER, askerName, seerUrl }
+    );
+    if (temp.error) throw new Error(temp.error);
+    priorUrl = temp.priorUrl;
+    console.log(
+      `  temp user ${TEMP_USER} (${temp.userId}) asks as ${temp.actorName} (${temp.classLevel}), of "${temp.party}" (${temp.partyMembers} members, ${temp.partyClues} clues on its board)`
+    );
+    console.log(`  Who may ask: ${temp.askers}; enabled: ${temp.enabled}; Service URL ${temp.priorUrl} → ${seerUrl} for the run`);
+
+    fp = new Foundry({ ...foundryConfig(env), user: TEMP_USER, password: "" });
+    console.log("[crystalball] connecting as the player…");
+    await fp.connect();
+    watch(fp, "player", lines);
+
+    // --- C. the player asks the ball ------------------------------------------------------
+    console.log("# C. the player asks the ball");
+    const C = await fp.evaluate(
+      async ({ id, question }) => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const until = async (test, ms) => {
+          for (const end = Date.now() + ms; Date.now() < end; await sleep(100)) {
+            const v = test();
+            if (v) return v;
+          }
+          return null;
+        };
+        const base = game.settings.get(id, "serviceUrl").replace(/\/+$/, "");
+        const cookieSession = document.cookie.split("; ").some(c => c.startsWith("session="));
+        const session =
+          Object.fromEntries(document.cookie.split("; ").map(c => c.split("="))).session ?? game.socket?.session?.sessionId ?? null;
+        const usageNow = () =>
+          fetch(`${base}/usage/me`, { headers: { "X-Foundry-Session": decodeURIComponent(session ?? "") } })
+            .then(r => r.json())
+            .catch(() => null);
+
+        const win = game.modules.get(id).api.open();
+        const settled = await until(() => win.element?.querySelector(".crystalball-body:not(.is-loading)"), 20_000);
+        const el = win.element;
+        const model = el?.querySelector(".crystalball-model")?.textContent?.trim() ?? null;
+        const darkLine = el?.querySelector(".crystalball-dark")?.textContent?.trim() ?? null;
+        const countBefore = el?.querySelector(".crystalball-count")?.textContent?.trim() ?? null;
+        const intro = el?.querySelector(".crystalball-intro")?.textContent?.trim() ?? null;
+        const turnsBefore = el?.querySelectorAll(".crystalball-turn").length ?? 0;
+        const balls = () => [...(win.element?.querySelectorAll(".crystalball-turn.ball") ?? [])];
+        const ballsBefore = balls().length;
+        const usageBefore = await usageNow();
+        const socketSession = game.socket?.session?.sessionId ?? null;
+        if (!settled || darkLine) return { settled: !!settled, model, darkLine, cookieSession, socketSession };
+
+        // Type and press Enter, as a player would.
+        const area = el.querySelector("textarea[name=message]");
+        area.value = question;
+        area.dispatchEvent(new Event("input", { bubbles: true }));
+        const counter = el.querySelector(".crystalball-counter")?.textContent?.trim() ?? null;
+        area.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+        // The send redraws before it streams: wait for the new turn, then for it to finish.
+        const started = await until(() => balls().length > ballsBefore, 5_000);
+        const t0 = Date.now();
+        const finished = await until(() => {
+          const last = balls().length > ballsBefore ? balls().pop() : null;
+          return last && !last.classList.contains("pending") ? last : null;
+        }, 60_000);
+        const ms = Date.now() - t0;
+        // The text with each drawn <br> read as the newline it was.
+        const textOf = node => {
+          const clone = node?.cloneNode(true);
+          for (const br of clone?.querySelectorAll("br") ?? []) br.replaceWith("\n");
+          return clone?.textContent?.trim() ?? "";
+        };
+        const answer = textOf(finished?.querySelector(".crystalball-text"));
+        const answerHtml = finished?.querySelector(".crystalball-text")?.innerHTML ?? "";
+        const error = finished?.querySelector(".crystalball-error")?.textContent?.trim() ?? null;
+        const userTurn = [...win.element.querySelectorAll(".crystalball-turn.user .crystalball-text")].pop()?.textContent ?? null;
+        await until(() => win.element?.querySelector(".crystalball-count")?.textContent?.trim() !== countBefore, 5_000);
+        const countAfter = win.element?.querySelector(".crystalball-count")?.textContent?.trim() ?? null;
+        const usageAfter = await usageNow();
+        const draftCleared = win.element?.querySelector("textarea[name=message]")?.value === "";
+
+        // New sitting: the transcript empties and the first line shows again.
+        win.element.querySelector('[data-action="newSitting"]')?.click();
+        const emptied = await until(() => !win.element?.querySelector(".crystalball-turn") && win.element?.querySelector(".crystalball-intro"), 10_000);
+        const current = await fetch(`${base}/sittings/current`, { headers: { "X-Foundry-Session": decodeURIComponent(session ?? "") } })
+          .then(r => r.json())
+          .catch(() => null);
+        await win.close();
+        return {
+          settled: !!settled,
+          model,
+          darkLine,
+          cookieSession,
+          socketSession,
+          intro,
+          turnsBefore,
+          countBefore,
+          countAfter,
+          counter,
+          started: !!started,
+          finished: !!finished,
+          ms,
+          answer,
+          answerHtml,
+          error,
+          userTurn,
+          usageBefore,
+          usageAfter,
+          draftCleared,
+          emptied: !!emptied,
+          currentTurns: Array.isArray(current?.turns) ? current.turns.length : null
+        };
+      },
+      { id: MODULE_ID, question: QUESTION }
+    );
+    // The id the window sends: the cookie as document.cookie shows it, else the one Foundry's socket
+    // was handed. Either must be the browser's own session cookie, the one the Seer probes with.
+    const jar = (await fp.page.context().cookies()).find(c => c.name === "session") ?? null;
+    console.log(
+      `  the session cookie is ${C.cookieSession ? "readable from document.cookie" : "NOT readable from document.cookie (the socket's id stands in)"}; httpOnly=${jar?.httpOnly}`
+    );
+    assert(!!jar && (C.cookieSession || decodeURIComponent(jar.value) === C.socketSession), "the id the window sends is the browser's session cookie");
+    assert(C.settled && !C.darkLine, `the window settled, not dark ("${C.darkLine ?? ""}")`);
+    assert(!!C.model && !["Gazing…", "Dark"].includes(C.model), `the status bar names a model ("${C.model}"; healthz: ${health.model})`);
+    if (C.settled && !C.darkLine) {
+      if (C.turnsBefore === 0) assert(!!C.intro, `an empty sitting shows the first line ("${C.intro?.slice(0, 80)}…")`);
+      assert(C.counter === `${QUESTION.length} / 4,000`, `the counter follows the typing (${C.counter})`);
+      assert(C.started && C.finished, `Enter sent it and the ball's turn finished (${C.ms} ms)`);
+      assert(!C.error, `the ball's turn carries no error line (${C.error ?? "none"})`);
+      assert(C.answer.length > 0, `the answer is not empty: "${C.answer.slice(0, 160)}"`);
+      assert(C.userTurn === QUESTION, "the player's turn shows the question as typed");
+      assert(C.draftCleared, "the input emptied on send");
+      if (health.model === "stub") {
+        const m =
+          /The Crystal Ball is clouded \(stub\)\. I see (\d+) shared pages, (\d+) clues, (\d+) party members\s+and your character (.+?) \((.+?)\)\. You asked: "(.*)"\./s.exec(
+            C.answer
+          );
+        assert(!!m, "the stub's sentence, as the contract words it");
+        if (m) {
+          const [, pages, clues, members, name, classLevel, asked] = m;
+          console.log(`  stub: ${pages} shared pages, ${clues} clues, ${members} party members, ${name} (${classLevel})`);
+          assert(name === temp.actorName, `the stub names the asker's character (${name})`);
+          assert(Number(clues) > 0, `the stub counts the party's clues (${clues}; the board holds ${temp.partyClues})`);
+          assert(asked === QUESTION, "the stub repeats the question");
+        }
+      }
+      const before = C.usageBefore?.user?.day;
+      const after = C.usageAfter?.user?.day;
+      assert(Number.isFinite(before) && after === before + 1, `usage/me moved by one (${before} → ${after}); the bar: "${C.countBefore}" → "${C.countAfter}"`);
+      assert(C.emptied, "New sitting emptied the transcript and showed the first line again");
+      assert(C.currentTurns === 0, `the Seer's open sitting is empty after New sitting (${C.currentTurns} turns)`);
+    }
+  }
+} finally {
+  await cleanup();
+}
+
+// --- the console --------------------------------------------------------------------------
+console.log("# console");
+// The GM page's default Service URL is a path the sandbox serves nothing at: those 404s are the dark state working.
+const expected = l => /http 404\] .*\/crystalball\/(healthz|sittings|usage)/.test(l) || /Failed to load resource.*404/.test(l);
+const shown = lines.filter(l => !expected(l));
+for (const l of shown.slice(0, 40)) console.log(`  ${l}`);
+if (shown.length > 40) console.log(`  … ${shown.length - 40} more`);
+// Ours: an error naming the module, or any error about the Seer's address (a CORS refusal names only that).
+const seerHost = new URL(seerUrl).host;
+const ours = shown.filter(l => (/crystal ?ball/i.test(l) || l.includes(seerHost)) && /error|pageerror/.test(l));
+assert(ours.length === 0, `no errors of the module's on either page (${ours.length})`);
+console.log(fails ? `RED (${fails} failed)` : "GREEN");
+process.exit(fails ? 1 : 0);

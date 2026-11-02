@@ -1,7 +1,7 @@
 {
   "id": "fvtt-mod-crystalball",
   "title": "Open Roll 5e: Crystal Ball",
-  "description": "One sentence: what the module does at the table.",
+  "description": "A crystal ball on the sidebar: a player asks a Claude model about the game as their character knows it — the journal they can read, their sheet, their party and its clues — answered by a service beside the server.",
   "version": "0.1.0",
   "authors": [
     {
@@ -10,6 +10,9 @@
   ],
   "esmodules": [
     "scripts/crystalball.js"
+  ],
+  "styles": [
+    "styles/crystalball.css"
   ],
   "languages": [
     {

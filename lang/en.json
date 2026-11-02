@@ -3,9 +3,92 @@
     "settings": {
       "enabled": {
         "name": "Enabled",
-        "hint": "Off leaves the world exactly as Foundry and the system have it."
+        "hint": "Off hides the Crystal Ball button on every client, and the Seer answers no one; the sittings it has kept stay where they are."
+      },
+      "serviceUrl": {
+        "name": "Service URL",
+        "hint": "Where the window reaches the Seer: a path on this server (the default, /crystalball, when the server routes it to the Seer) or a full URL (on a local test table, http://localhost:30001)."
+      },
+      "tableNotes": {
+        "name": "Table notes",
+        "hint": "Your standing notes to the ball, added to its instructions for every player who asks: its manner, what it should decline, the table's house facts."
+      },
+      "askers": {
+        "name": "Who may ask",
+        "hint": "Every user, or only the users listed below.",
+        "players": "Every user",
+        "listed": "Only the listed users"
+      },
+      "askerIds": {
+        "name": "Listed users",
+        "hint": "When Who may ask is set to the listed users: their user ids, separated by commas."
+      },
+      "gmGaze": {
+        "name": "The GM's gaze",
+        "hint": "What the ball knows when a GM asks: what the players can see plus the GM's own pages (so you test what your players get), or everything in the world.",
+        "player": "What the players see",
+        "all": "Everything"
       }
     },
-    "elected": "This client acts for the table."
+    "tab": "Crystal Ball",
+    "window": {
+      "title": "Crystal Ball"
+    },
+    "intro": "The ball knows what you could read yourself: the journal pages you can open, your character, your party and its clues. It answers through Anthropic's Claude, and your DM can read your sittings.",
+    "status": {
+      "loading": "Gazing…",
+      "dark": "Dark",
+      "count": "{n} of {max} today"
+    },
+    "newSitting": "New sitting",
+    "newSittingHint": "Close this sitting (the DM keeps it) and start a fresh one",
+    "retry": "Retry",
+    "send": "Send",
+    "input": {
+      "label": "Your question to the ball",
+      "placeholder": "Ask the ball…",
+      "hint": "Enter sends, Shift+Enter for a new line",
+      "counter": "{n} / {max}"
+    },
+    "turn": {
+      "you": "You",
+      "ball": "The Crystal Ball"
+    },
+    "dark": {
+      "unreachable": "The ball is dark: the Seer, the service that answers it, cannot be reached.",
+      "foundry": "The ball is dark: the Seer has lost its link to this world.",
+      "world": "The ball is dark: the Seer sees no open world."
+    },
+    "errors": {
+      "unknownSession": "The ball does not know you: your session was not recognised. Reload Foundry and ask again.",
+      "notAllowed": "The ball is not yours to ask in this world; the DM decides who may.",
+      "tooLong": "That is too long for the ball: {limit} characters at most.",
+      "limit": {
+        "hour": "You have asked the ball enough for this hour. Ask again in {wait}.",
+        "day": "You have asked the ball enough for today. Ask again in {wait}.",
+        "tableDay": "The table has spent today's gazing. The ball clears again in {wait}.",
+        "tableMonth": "The table has spent this month's gazing. The ball clears again in {wait}."
+      },
+      "dark": {
+        "foundryDisconnected": "The ball clouded over: the Seer lost its link to the world. Try again in a moment.",
+        "worldClosed": "The ball clouded over: the world is not open.",
+        "model": "The ball clouded over before it could answer. Try again."
+      },
+      "seer": "The Seer stumbled ({message}). Try again.",
+      "seerQuiet": "The Seer stumbled. Try again.",
+      "status": "The ball could not answer (HTTP {status}).",
+      "network": "The ball could not reach the Seer. Try again.",
+      "cut": "The answer was cut off before it finished.",
+      "timeout": "The ball took too long to answer."
+    },
+    "wait": {
+      "second": "{n} second",
+      "seconds": "{n} seconds",
+      "minute": "{n} minute",
+      "minutes": "{n} minutes",
+      "hour": "{n} hour",
+      "hours": "{n} hours",
+      "later": "a little while"
+    }
   }
 }
