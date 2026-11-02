@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.env
+seer/.env
+seer/data/

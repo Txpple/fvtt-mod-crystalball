@@ -1,0 +1,25 @@
+{
+  "name": "fvtt-mod-crystalball",
+  "private": true,
+  "type": "module",
+  "description": "Development tooling for Crystal Ball. NOTHING HERE SHIPS: the module is plain ES modules loaded straight from scripts/, with no build step. This file declares the gate (Biome and the unit tests).",
+  "scripts": {
+    "verify": "npm run check && npm run test",
+    "check": "biome check --error-on-warnings .",
+    "check:fix": "biome check --write .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "vitest": "~3.2.6"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "author": "Txpple",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Txpple/fvtt-mod-crystalball.git"
+  }
+}

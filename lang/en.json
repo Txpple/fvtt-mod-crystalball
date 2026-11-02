@@ -1,0 +1,11 @@
+{
+  "fvtt-mod-example": {
+    "settings": {
+      "enabled": {
+        "name": "Enabled",
+        "hint": "Off leaves the world exactly as Foundry and the system have it."
+      }
+    },
+    "elected": "This client acts for the table."
+  }
+}
