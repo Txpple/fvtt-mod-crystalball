@@ -33,8 +33,8 @@ system user, the clone at `v1.0.0` under `/opt/crystalball`, the env file under 
 and the identity probe green through the public hostname, a forged id 401. No model call on prod yet: the first
 player's sitting is the user's. **1.0.1 the same day**: a saying drawn fresh over each empty sitting (no word of
 Claude or the DM) and a 4,096-token answer cap, a cut answer marked by `done`'s `stop`; released, installed on
-prod (17/17 served files byte-identical), the box's Seer still at `v1.0.0` until the user moves it (the guide's
-Updating); the sandbox on 1.0.1, its Seer from a terminal, its Service URL set back to the local Seer after the
+prod (17/17 served files byte-identical), the box's Seer at `v1.0.1` by the guide's Updating (`sudo` for its
+`git`), `healthz` 1.0.1 through the public hostname; the sandbox on 1.0.1, its Seer from a terminal, its Service URL set back to the local Seer after the
 mirror reset it. Measured on this world: the DM's gaze ≈ 90k tokens (every own page and four sheets under `gmGaze`
 `player`), a Warlock player's ≈ 69k, a Paladin's ≈ 46k, the lore 37k of each (the Bestiary's eleven pages and
 the four backstories are player-observable); a 1,400-token answer takes about sixteen seconds at low effort.
