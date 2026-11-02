@@ -68,7 +68,7 @@ Body `{ "message": "<text>" }`. The reply is a Server-Sent Events stream (`Conte
 | --- | --- | --- |
 | `meta` | `{ "sittingId", "model", "gazeTokens": n, "layers": { "instructions": n, "lore": n, "party": n, "own": n } }` | first; token counts are the Seer's estimate (or `count_tokens` when a key is present) |
 | `delta` | `{ "text": "<piece>" }` | zero or more; the answer in order |
-| `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n, "day": n } }` | last on success |
+| `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n, "day": n }, "stop": "<the model's stop reason>" }` | last on success; `stop` is the API's `stop_reason` (`end_turn` for the stub), and `max_tokens` means the answer ran into `config.maxOutputTokens`, which the window marks under the answer |
 | `error` | `{ "error": "<code as in the table above>", "message": "<short>", "reason"?: "<as the 503 body's>", "scope"?: "<as the 429 body's>", "retryAfter"?: <seconds> }` | last on failure after the stream opened; `reason` rides with `dark`, `scope` and `retryAfter` with `limit`, so the window words it as it would the status |
 
 The client reads the stream with `fetch` and a `ReadableStream` reader (an `EventSource` cannot send the header).
@@ -124,7 +124,7 @@ never written to disk.
 
 `@anthropic-ai/sdk`, `client.messages.stream(...)`: `model` from config (`claude-opus-5-5` default,
 `claude-sonnet-5-5` the other), no `thinking` parameter (adaptive is the model's default), `output_config:
-{ effort: config.effort }` (`medium` default), `max_tokens: config.maxOutputTokens` (2048), `betas:
+{ effort: config.effort }` (`medium` default), `max_tokens: config.maxOutputTokens` (4096), `betas:
 ["server-side-fallback-2026-07-01"]` with `fallbacks: "default"` through the beta client when
 `config.refusalFallback` is true (default true). The response `usage` fields `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens` make the ledger line, priced by

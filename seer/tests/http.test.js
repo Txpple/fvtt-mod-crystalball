@@ -338,6 +338,7 @@ describe("POST chat", () => {
     expect(done.data.usage).toMatchObject({ cacheWrite: 0, cacheRead: 0 });
     expect(done.data.cost).toBe(0);
     expect(done.data.remaining).toEqual({ hour: 9, day: 39 });
+    expect(done.data.stop).toBe("end_turn");
 
     const lines = s.ledger.read();
     expect(lines).toHaveLength(1);

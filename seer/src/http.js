@@ -333,7 +333,13 @@ export function createServer({
       // The contract: a turn is stored only when `done` is sent; a client that left gets neither.
       if (left() || res.destroyed) return;
       const { remaining } = limits.report(user._id);
-      sse.send("done", { text: result.text, usage: result.usage, cost: result.cost, remaining });
+      sse.send("done", {
+        text: result.text,
+        usage: result.usage,
+        cost: result.cost,
+        remaining,
+        stop: result.stopReason
+      });
       doneSent = true;
       sittings.append(
         user._id,

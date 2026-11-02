@@ -16,7 +16,7 @@
 
 <section class="crystalball-transcript" aria-live="polite">
     {{#if intro}}
-    <p class="crystalball-intro">{{ localize "fvtt-mod-crystalball.intro" }}</p>
+    <p class="crystalball-intro">{{ intro }}</p>
     {{/if}}
     {{#each turns}}
     <article class="crystalball-turn {{#if user}}user{{else}}ball{{/if}}{{#if pending}} pending{{/if}}">
@@ -26,6 +26,7 @@
         {{else}}
         <div class="crystalball-text">{{{ html }}}</div>
         {{/if}}
+        {{#if note}}<p class="crystalball-note">{{ note }}</p>{{/if}}
         {{#if error}}<p class="crystalball-error">{{ error }}</p>{{/if}}
     </article>
     {{/each}}

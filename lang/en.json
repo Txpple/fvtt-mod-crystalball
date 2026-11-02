@@ -34,7 +34,49 @@
     "window": {
       "title": "Crystal Ball"
     },
-    "intro": "The ball knows what you could read yourself: the journal pages you can open, your character, your party and its clues. It answers through Anthropic's Claude, and your DM can read your sittings.",
+    "saying": {
+      "stir": [
+        "The mists inside the glass stir and part.",
+        "A pale light wakes in the heart of the ball.",
+        "The glass clouds, then clears like still water.",
+        "Something old turns over in the depths of the crystal.",
+        "Smoke curls within the orb and settles into shapes.",
+        "The ball hums, low, as if it had been waiting.",
+        "Starlight gathers where there should be none.",
+        "Your reflection fades, and something else looks back.",
+        "The crystal grows cold beneath your fingers.",
+        "A slow tide of silver washes across the glass.",
+        "The candle gutters; the orb does not.",
+        "Faint whispers rise from the glass, and fall silent."
+      ],
+      "sight": [
+        "It sees what {name} has seen, and remembers what {name} has read.",
+        "It knows the pages you could turn yourself, and no more.",
+        "Your companions' deeds glimmer in its depths.",
+        "The clues you gathered drift through the fog like embers.",
+        "It holds your story, written in your own hand and others'.",
+        "What the party has found, the ball has kept.",
+        "It reads no secrets but the ones you already hold.",
+        "Old roads and half-heard names wait in the haze.",
+        "It knows the weight of your pack and the scars on your shield.",
+        "Every mystery the party has pinned shines faintly within.",
+        "The glass remembers what {name} would rather forget.",
+        "Threads of what you know weave and unweave in the light."
+      ],
+      "ask": [
+        "Ask, and it will answer.",
+        "Speak your question, {name}.",
+        "What would you know?",
+        "Ask plainly; the ball dislikes riddles that are not its own.",
+        "Lean closer, and ask.",
+        "The ball is listening.",
+        "Ask what troubles you.",
+        "Ask, and see what surfaces.",
+        "One question, then another; the ball is patient.",
+        "Say what you seek, and it will look."
+      ]
+    },
+    "long": "The vision faded before the end; ask the ball to go on.",
     "status": {
       "loading": "Gazing…",
       "dark": "Dark",

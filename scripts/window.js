@@ -13,6 +13,7 @@
 
 import { log, MODULE_ID, setting, t } from "./common.js";
 import { renderMarkdown } from "./decide/markdown.js";
+import { composeSaying } from "./decide/saying.js";
 import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceBase, sessionIdFrom, waitOf } from "./decide/session.js";
 import { createSseParser } from "./decide/sse.js";
 
@@ -189,6 +190,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   #stick = true;
   /** The New sitting in flight. */
   #renewing = null;
+  /** The saying over an empty sitting: drawn anew when the window opens and on a new sitting. */
+  #saying = "";
 
   /** @override */
   async _prepareContext(options) {
@@ -203,13 +206,14 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       darkLine: this.#darkLine,
       model: this.#model ?? t(dark ? "status.dark" : "status.loading"),
       count: this.#countLine(),
-      intro: !loading && !dark && !this.#turns.length,
+      intro: !loading && !dark && !this.#turns.length ? this.#saying : "",
       turns: this.#turns.map(turn => ({
         user: turn.role === "user",
         who: turn.role === "user" ? you : t("turn.ball"),
         text: turn.role === "user" ? turn.text : "",
         html: turn.role === "ball" ? renderMarkdown(turn.text) : "",
         error: turn.error ?? "",
+        note: turn.note ?? "",
         pending: !!turn.pending
       })),
       draft: this.#draft,
@@ -219,6 +223,14 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       sendOff: !this.#canSend(),
       newOff: loading || dark || this.#busy || !!this.#renewing
     });
+  }
+
+  /** Draw a fresh saying, never the one just shown. */
+  #drawSaying() {
+    const key = `${MODULE_ID}.saying`;
+    const lists = foundry.utils.getProperty(game.i18n.translations, key) ?? foundry.utils.getProperty(game.i18n._fallback, key);
+    const name = game.user.character?.name ?? game.user.name ?? "";
+    this.#saying = composeSaying(lists, { name, previous: this.#saying });
   }
 
   #countLine() {
@@ -240,6 +252,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   _onFirstRender(context, options) {
     super._onFirstRender(context, options);
     this.#wantFocus = true;
+    this.#drawSaying();
     void this.reload();
   }
 
@@ -390,7 +403,10 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const gen = this.#gen;
     const sitting = await postNewSitting();
     if (gen !== this.#gen) return sitting;
-    if (sitting) this.#turns = [];
+    if (sitting) {
+      this.#turns = [];
+      this.#drawSaying();
+    }
     if (this.rendered) await this.render();
     const usage = await call("usage/me");
     if (gen !== this.#gen || !usage.ok) return sitting;
@@ -404,7 +420,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     if (!this.#canSend()) return;
     const text = this.#draft.trim();
     const gen = this.#gen;
-    const ball = { role: "ball", text: "", pending: true, error: "" };
+    const ball = { role: "ball", text: "", pending: true, error: "", note: "" };
     this.#turns.push({ role: "user", text }, ball);
     this.#draft = "";
     this.#busy = true;
@@ -481,6 +497,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
           this.#paintSoon();
         } else if (event === "done") {
           if (typeof data?.text === "string") ball.text = data.text;
+          // The answer ran into the Seer's length cap: what came is kept, and the player told.
+          if (data?.stop === "max_tokens") ball.note = t("long");
           stop();
           return "done";
         } else if (event === "error") {

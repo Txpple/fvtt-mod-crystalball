@@ -298,11 +298,16 @@
   animation: crystalball-glow 1.4s ease-in-out infinite;
 }
 
-.crystalball-error {
+.crystalball-error,
+.crystalball-note {
   margin: 0.15rem 0 0;
   color: var(--cb-red);
   font-size: var(--font-size-12, 0.75rem);
   font-style: italic;
+}
+
+.crystalball-note {
+  color: var(--cb-ink-3);
 }
 
 @keyframes crystalball-glow {

@@ -22,7 +22,7 @@ describe("the committed config", () => {
     expect(loadConfig(DEFAULTS_FILE)).toEqual({
       model: "claude-opus-5-5",
       effort: "medium",
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       cacheTtl: "5m",
       refusalFallback: true,
       callTimeoutMs: 60000,
