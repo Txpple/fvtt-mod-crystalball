@@ -46,7 +46,7 @@ classes can cast it?" --expect-lookup` GREEN on the real model: the window showe
 the answer in 15 seconds, two lookups, $0.38, nearly all of it the first write of a 66k-token gaze (the lookups'
 extra hops about three cents). Released through the reusable workflow, installed on prod through the installer
 (18/18 served files byte-identical), the box's Seer at `v1.0.2` by the guide's Updating, `healthz` 1.0.2 and a
-forged id 401 through the public hostname; no rulebook call on prod yet. The sandbox has 1.0.2's files `--local`,
+forged id 401 through the public hostname; the user tested it on prod ("i tested looks good"). The sandbox has 1.0.2's files `--local`,
 its manifest reading 1.0.1 until a restart; no Seer runs there now. Measured on the copies: a search answers in
 about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region page about 3,800); the tool
 definitions add about 350 tokens to the cached prefix.
