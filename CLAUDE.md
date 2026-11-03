@@ -141,7 +141,11 @@ slips of Haiku's own. The window: selectable words, a copy button per answer, Ex
 `crystalball-<character>-<date>.md`, a count only under an allowance; the walk checks them. `verify` green (402
 tests); deployed `--local`, the walk GREEN on Haiku; released through the reusable workflow, the installer PASS on prod
 with no player connected, 19/19 served files byte-identical with the zip; the box's Seer at `v1.0.7`, `healthz` 1.0.7
-on Haiku and a forged id 401 through the public hostname. Both worlds' *Table notes* are empty.
+on Haiku and a forged id 401 through the public hostname. Both worlds' *Table notes* are empty. **1.0.8 released and on
+prod: *The GM's gaze* removed** (the user: "remove it"): *Everything* opened only the world's journal, four entries
+here, while the DM's knowledge lives in the campaign repo; a GM now reads as the players do plus their own grants, a
+world's saved row ignored. `verify` green (401 tests), the walk GREEN on the sandbox (its Seer bounced alone, a player
+connected there); the installer PASS on prod, 19/19 served files byte-identical; the box's Seer at `v1.0.8`.
 
 ## The rules this module keeps
 
@@ -179,6 +183,9 @@ on Haiku and a forged id 401 through the public hostname. Both worlds' *Table no
   (instructions and the DM's table notes; the lore every player can observe; the party with its stash and Clue
   Board record; the player's own pages and curated sheets), the permission rule mirroring `testUserPermission` at
   OBSERVER, each layer a cached system block so a party shares the first three. The gaze is never written to disk.
+- **A GM reads as the players do, plus their own grants.** Foundry passes a GM everything; the ball does not: it is
+  the players' tool, the DM tests what they get, and the DM's knowledge (the plot, the session plans) lives in the
+  campaign repo, read by the MCP, never by the ball. No setting widens it (*The GM's gaze* went in 1.0.8).
 - **The instructions are a harness per model** (`seer/src/harness/`, picked by the model id in `instructions.js`,
   each versioned `<name>-<version>`; a wording change is a new version): Haiku's, tuned on this world, and the
   general one for any other model, untuned until the ball runs on it. Every harness keeps the contract's three
