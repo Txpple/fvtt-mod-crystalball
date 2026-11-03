@@ -91,8 +91,8 @@ export function serviceCandidates(serviceUrl, location) {
 }
 
 /**
- * The model's family name for the status bar, from the id `healthz` reports: "Opus", "Sonnet",
- * "stub"; an id of another family is shown as it is, none as null.
+ * The model's family name for a GM's tooltip on the status bar, from the id `healthz` reports:
+ * "Opus", "Sonnet", "stub"; an id of another family is shown as it is, none as null.
  * @param {unknown} model
  * @returns {string | null}
  */

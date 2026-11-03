@@ -1,7 +1,7 @@
 <div class="crystalball-body{{#if dark}} is-dark{{/if}}{{#if loading}} is-loading{{/if}}">
 <header class="crystalball-bar">
     <span class="crystalball-orb" aria-hidden="true"></span>
-    <span class="crystalball-model">{{ model }}</span>
+    <span class="crystalball-state"{{#if modelHint}} data-tooltip="{{ modelHint }}"{{/if}}>{{ state }}</span>
     {{#if count}}<span class="crystalball-count">{{ count }}</span>{{/if}}
     <span class="crystalball-spacer"></span>
     {{#if dark}}

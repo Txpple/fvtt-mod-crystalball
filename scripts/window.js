@@ -225,7 +225,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   #phase = "loading";
   /** Why the ball is dark, as the line the transcript shows. */
   #darkLine = "";
-  /** The model's family name from healthz (or the stream's meta). */
+  /** The model's family name from healthz (or the stream's meta), a GM's tooltip on the bar. */
   #model = null;
   /** usage/me's body, for the count. */
   #usage = null;
@@ -266,7 +266,9 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       loading,
       dark,
       darkLine: this.#darkLine,
-      model: this.#model ?? t(dark ? "status.dark" : "status.loading"),
+      // The bar says how the ball is, never which model: that is a GM's tooltip.
+      state: t(dark ? "status.dark" : loading ? "status.loading" : "status.ready"),
+      modelHint: game.user.isGM && this.#model ? t("status.model", { model: this.#model }) : "",
       count: this.#countLine(),
       intro: !loading && !dark && !this.#turns.length ? this.#saying : "",
       turns: this.#turns.map((turn, index) => ({

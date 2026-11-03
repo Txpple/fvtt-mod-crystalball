@@ -85,8 +85,10 @@
       "readAny": "The ball turns to {name}…"
     },
     "status": {
-      "loading": "Gazing…",
-      "dark": "Dark",
+      "loading": "Crystal Ball – Gazing…",
+      "dark": "Crystal Ball – Dark",
+      "ready": "Crystal Ball – Clear and Ready",
+      "model": "Model: {model}",
       "count": "{n} of {max} today"
     },
     "export": {

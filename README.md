@@ -18,8 +18,10 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
   window in the middle of the screen, one per client.
 - **A sitting.** The window is a transcript and an input. A player types a question and the ball answers, the
   words arriving as they are written. The conversation is the player's **sitting**; it is kept on the server
-  between visits, and *New sitting* starts a fresh one. The status bar names the model, and the player's count
-  against their daily allowance when the model has one (Haiku, the default, has none, so it shows no count). The
+  between visits, and *New sitting* starts a fresh one. The status bar says *Crystal Ball – Clear and Ready*
+  (*Gazing…* while it connects, *Dark* when it cannot answer), never the model, which a GM sees by pointing at it;
+  beside it, the player's count against their daily allowance when the model has one (Haiku, the default, has
+  none, so it shows no count). The
   DM can read sittings on the box, and the window says so.
 - **Keeping what it said.** The words can be selected and copied, and each answer has a copy button. *Export*
   (the file icon in the bar, as in Clue Board and Card Catalogue) saves the sitting to the browser's downloads as

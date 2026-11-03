@@ -8,24 +8,30 @@
 // Without --walk: the module active, its world settings registered as the contract names them,
 // the button on the GM page's strip right after Clue Board's (no tab, no action), the
 // window it opens centred, and, with the default Service URL, lit by the Seer on the companion
-// port when one runs there and dark when none does.
+// port when one runs there (the bar clear and ready, the model only in the GM's tooltip) and dark
+// when none does.
 //
 // With --walk: a temporary player (assigned the --asker member's character and Owner on it for
 // the run) opens the window against the Seer at --seer (default http://localhost:30001/crystalball,
 // the Seer's BASE_PATH included; the Service URL setting is pointed there for the run, or left at
 // the contract's default with --default-url, so the window finds the Seer on the companion port
 // as a sandbox's does), sends a question with Enter, waits for the ball's answer to finish, checks
-// the stub's sentence when the Seer runs its stub model, that usage/me moved by one and the bar shows
-// a count only while the model has an allowance, that the answer can be selected and its copy button
+// the stub's sentence when the Seer runs its stub model, that the bar says the ball is clear and
+// ready and names no model to the player, that usage/me moved by one and the bar shows a count
+// only while the model has an allowance, that the answer can be selected and its copy button
 // copies the ball's words, that Export saves the sitting as Markdown, and that New sitting empties
 // the transcript. The temp user, its ownership and the setting go in `finally`.
 // --question asks something else; --expect-lookup asserts the window showed the rulebook lookup
 // line under the pending turn (a rules question on a real model).
+import { readFileSync } from "node:fs";
 import { Foundry, foundryConfig, loadEnv } from "fvtt-mcp-dnd5e/client";
 import { DEFAULT_LEAVE_OUT, DEFAULT_RULEBOOKS } from "../scripts/decide/rulebooks.js";
+import { modelLabel } from "../scripts/decide/session.js";
 
 const env = loadEnv();
 const MODULE_ID = "fvtt-mod-crystalball";
+/** The bar's words, as lang/en.json has them. */
+const STATUS = JSON.parse(readFileSync(new URL("../lang/en.json", import.meta.url), "utf8"))[MODULE_ID].status;
 const TEMP_USER = "ZZ-BALL Asker";
 const argOf = n => {
   const i = process.argv.indexOf(`--${n}`);
@@ -170,7 +176,8 @@ try {
         darkLine: el?.querySelector(".crystalball-dark")?.textContent?.trim() ?? null,
         retry: !!el?.querySelector('[data-action="retry"]'),
         inputOff: !!el?.querySelector("textarea[name=message]")?.disabled,
-        model: el?.querySelector(".crystalball-model")?.textContent?.trim() ?? null,
+        state: el?.querySelector(".crystalball-state")?.textContent?.trim() ?? null,
+        modelHint: el?.querySelector(".crystalball-state")?.getAttribute("data-tooltip") ?? null,
         title: win?.title ?? null
       };
       await win?.close();
@@ -229,15 +236,19 @@ try {
   assert(A.opened && A.centred, "the button opens the window, centred");
   assert(A.state.title === "Crystal Ball", `the window is titled Crystal Ball (${A.state.title})`);
   assert(A.sidebarStill, "the click left the sidebar's tab and its expansion as they were");
-  console.log(`  Service URL: ${A.serviceUrl}; the window: model "${A.state.model}", dark=${A.state.dark}`);
+  console.log(`  Service URL: ${A.serviceUrl}; the window: "${A.state.state}" (tooltip "${A.state.modelHint ?? ""}"), dark=${A.state.dark}`);
   if (A.serviceUrl === "/crystalball") {
     // No tunnel on the sandbox: Foundry itself answers /crystalball/healthz with a 404, and the window
     // then tries the companion port of the page's host (the GM page is on localhost).
     const companion = await fetch("http://localhost:30001/crystalball/healthz")
       .then(r => (r.ok ? r.json() : null))
       .catch(() => null);
-    if (companion) assert(!A.state.dark && !A.state.inputOff, `with the default Service URL the window found the Seer ${companion.version} on the companion port (model "${A.state.model}")`);
-    else assert(A.state.dark && A.state.retry && A.state.inputOff, `with no Seer at the default path nor on the companion port the ball is dark, the input off, Retry offered ("${A.state.darkLine}")`);
+    if (companion) {
+      assert(!A.state.dark && !A.state.inputOff, `with the default Service URL the window found the Seer ${companion.version} on the companion port`);
+      assert(A.state.state === STATUS.ready, `the bar says "${STATUS.ready}" ("${A.state.state}")`);
+      const hint = STATUS.model.replace("{model}", modelLabel(companion.model) ?? "");
+      assert(A.state.modelHint === hint, `the GM's tooltip on the bar names the model ("${A.state.modelHint ?? ""}"; healthz: ${companion.model})`);
+    } else assert(A.state.dark && A.state.retry && A.state.inputOff, `with no Seer at the default path nor on the companion port the ball is dark, the input off, Retry offered ("${A.state.darkLine}")`);
   }
 
   if (walk) {
@@ -322,7 +333,8 @@ try {
         const win = game.modules.get(id).api.open();
         const settled = await until(() => win.element?.querySelector(".crystalball-body:not(.is-loading)"), 20_000);
         const el = win.element;
-        const model = el?.querySelector(".crystalball-model")?.textContent?.trim() ?? null;
+        const state = el?.querySelector(".crystalball-state")?.textContent?.trim() ?? null;
+        const modelHint = el?.querySelector(".crystalball-state")?.getAttribute("data-tooltip") ?? null;
         const darkLine = el?.querySelector(".crystalball-dark")?.textContent?.trim() ?? null;
         const countBefore = el?.querySelector(".crystalball-count")?.textContent?.trim() ?? null;
         const intro = el?.querySelector(".crystalball-intro")?.textContent?.trim() ?? null;
@@ -331,7 +343,7 @@ try {
         const ballsBefore = balls().length;
         const usageBefore = await usageNow();
         const socketSession = game.socket?.session?.sessionId ?? null;
-        if (!settled || darkLine) return { settled: !!settled, model, darkLine, cookieSession, socketSession };
+        if (!settled || darkLine) return { settled: !!settled, state, modelHint, darkLine, cookieSession, socketSession };
 
         // Type and press Enter, as a player would.
         const area = el.querySelector("textarea[name=message]");
@@ -427,7 +439,8 @@ try {
         await win.close();
         return {
           settled: !!settled,
-          model,
+          state,
+          modelHint,
           darkLine,
           cookieSession,
           socketSession,
@@ -465,7 +478,8 @@ try {
     console.log(`  the session cookie: httpOnly=${jar?.httpOnly}, ${C.cookieSession ? "readable" : "not readable"} from document.cookie`);
     assert(!!jar && !!C.socketSession && decodeURIComponent(jar.value) === C.socketSession, "the id the window sends (the socket's) is the browser's session cookie");
     assert(C.settled && !C.darkLine, `the window settled, not dark ("${C.darkLine ?? ""}")`);
-    assert(!!C.model && !["Gazing…", "Dark"].includes(C.model), `the status bar names a model ("${C.model}"; healthz: ${health.model})`);
+    assert(C.state === STATUS.ready, `the bar says "${STATUS.ready}" ("${C.state}")`);
+    assert(!C.modelHint, `the bar names no model to a player ("${C.modelHint ?? ""}"; healthz: ${health.model})`);
     if (C.settled && !C.darkLine) {
       if (C.turnsBefore === 0) assert(!!C.intro, `an empty sitting shows the first line ("${C.intro?.slice(0, 80)}…")`);
       assert(C.counter === `${QUESTION.length} / 4,000`, `the counter follows the typing (${C.counter})`);
