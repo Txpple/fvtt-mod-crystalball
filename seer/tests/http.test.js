@@ -18,7 +18,9 @@ import { createModel } from "../src/model.js";
 import { createSittings } from "../src/sittings.js";
 import { quietLog, tempDir, until, world } from "./helpers.js";
 
-const CONFIG = loadConfig(DEFAULTS_FILE);
+// A capped table: the question caps are what several of these tests count against.
+const DEFAULTS = loadConfig(DEFAULTS_FILE);
+const CONFIG = { ...DEFAULTS, limits: { ...DEFAULTS.limits, perUserHour: 10, perUserDay: 40 } };
 const ORIGIN = "http://localhost:30000";
 const ADA = "adaSession00000000000001";
 const CY = "cySession000000000000001";

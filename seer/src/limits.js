@@ -60,8 +60,10 @@ export function decide({ limits, calls, userId, message, now }) {
     return refuse("table-month", secondsUntil(nextMonth(now), now));
   if (t.tableDay.cost >= limits.tableDayUsd)
     return refuse("table-day", secondsUntil(nextDay(now), now));
-  if (t.day >= limits.perUserDay) return refuse("day", secondsUntil(nextDay(now), now));
-  if (t.hour >= limits.perUserHour) {
+  // A null count is no cap: a cheap model's table may ask as often as it likes.
+  if (limits.perUserDay != null && t.day >= limits.perUserDay)
+    return refuse("day", secondsUntil(nextDay(now), now));
+  if (limits.perUserHour != null && t.hour >= limits.perUserHour) {
     // The call that has to leave the window before one more fits.
     const leaving = t.hourTimes[t.hour - limits.perUserHour];
     return refuse("hour", secondsUntil(new Date(leaving + HOUR), now));
@@ -82,8 +84,8 @@ export function usageReport({ limits, calls, userId, now }) {
       tableMonthUsd: limits.tableMonthUsd
     },
     remaining: {
-      hour: Math.max(0, limits.perUserHour - t.hour),
-      day: Math.max(0, limits.perUserDay - t.day)
+      hour: limits.perUserHour == null ? null : Math.max(0, limits.perUserHour - t.hour),
+      day: limits.perUserDay == null ? null : Math.max(0, limits.perUserDay - t.day)
     }
   };
 }

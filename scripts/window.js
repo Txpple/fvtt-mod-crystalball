@@ -294,7 +294,10 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   #countLine() {
     const day = this.#usage?.user?.day;
     const max = this.#usage?.limits?.perUserDay;
-    return Number.isFinite(day) && Number.isFinite(max) ? t("status.count", { n: day, max }) : "";
+    if (!Number.isFinite(day)) return "";
+    // A null day cap is no cap (a cheap model): the count alone.
+    if (max === null) return t("status.countUncapped", { n: day });
+    return Number.isFinite(max) ? t("status.count", { n: day, max }) : "";
   }
 
   #counter(length) {

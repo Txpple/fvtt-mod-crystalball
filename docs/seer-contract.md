@@ -74,6 +74,8 @@ Closes the open sitting (archived on disk) and opens a fresh one: `{ "id": "<id>
 
 `{ "user": { "hour": n, "day": n }, "table": { "day": { "messages": n, "cost": <usd> }, "month": { "messages": n,
 "cost": <usd> } }, "limits": { "perUserHour": n, "perUserDay": n, "tableDayUsd": x, "tableMonthUsd": x } }`.
+`perUserHour` or `perUserDay` is `null` when the configured model has no such cap (see *Limits*); the window then
+shows the day's count alone.
 
 ### `POST chat`
 
@@ -85,7 +87,7 @@ Body `{ "message": "<text>" }`. The reply is a Server-Sent Events stream (`Conte
 | `meta` | `{ "sittingId", "model", "gazeTokens": n, "layers": { "instructions": n, "lore": n, "party": n, "own": n } }` | first; token counts are the Seer's estimate (or `count_tokens` when a key is present) |
 | `delta` | `{ "text": "<piece>" }` | zero or more; the answer in order; a hop's words after an earlier hop's begin with a blank line (`"\n\n"`) |
 | `lookup` | `{ "action": "search", "query": "<words>" }` or `{ "action": "read", "name": "<entry>", "book": "<book>" }` | zero or more, between deltas; the ball is looking something up in the rulebooks; the window says so under the pending turn until the next delta (a window that knows no `lookup` ignores it) |
-| `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n, "day": n }, "stop": "<the model's stop reason>" }` | last on success; `stop` is the API's `stop_reason` (`end_turn` for the stub), and `max_tokens` means the answer ran into `config.maxOutputTokens`, which the window marks under the answer |
+| `done` | `{ "text": "<the whole answer>", "usage": { "input": n, "cacheWrite": n, "cacheRead": n, "output": n }, "cost": <usd>, "remaining": { "hour": n | null, "day": n | null }, "stop": "<the model's stop reason>" }` | last on success; `stop` is the API's `stop_reason` (`end_turn` for the stub), and `max_tokens` means the answer ran into `config.maxOutputTokens`, which the window marks under the answer |
 | `error` | `{ "error": "<code as in the table above>", "message": "<short>", "reason"?: "<as the 503 body's>", "scope"?: "<as the 429 body's>", "retryAfter"?: <seconds> }` | last on failure after the stream opened; `reason` rides with `dark`, `scope` and `retryAfter` with `limit`, so the window words it as it would the status |
 
 The client reads the stream with `fetch` and a `ReadableStream` reader (an `EventSource` cannot send the header).
@@ -136,9 +138,14 @@ Permission rule, mirrored from Foundry's `testUserPermission` at OBSERVER: a use
 sees everything (subject to `gmGaze`); otherwise the level is `ownership[userId] ?? ownership.default`, and `≥ 2`
 passes. A user with no character gets layers 1 and 2 and whatever of 3 and 4 applies (none, usually).
 
-Layers 1–4 are the system prompt, four text blocks, each with `cache_control: { type: "ephemeral" }` on the
-first three and top-level automatic caching for the rest (`config.cacheTtl` chooses `5m` or `1h`). The gaze is
-never written to disk.
+Layers 1–4 are the system prompt, four text blocks: a `cache_control: { type: "ephemeral" }` marker on the
+first three and top-level automatic caching for the rest. The markers carry two TTLs. `config.stableCacheTtl`
+(`1h` default) is on layers 1 and 2, the instructions and the lore: the bulk of the gaze, the same for the whole
+table, changed only by the DM's hand (the tools ahead of them cache in the same entry). `config.cacheTtl` (`5m`
+default) is on layer 3 and the top-level marker: the party changes with every hit point, the asker's own sheet
+with every rest, the conversation with every turn, and an hour's price on a block rewritten at the next blow is
+money spent for nothing. The API wants the longer TTL first, and the stable layers come first, so a config whose
+`stableCacheTtl` is shorter than its `cacheTtl` is refused at start. The gaze is never written to disk.
 
 ## The rulebooks
 
@@ -171,17 +178,23 @@ index grows reads it again); a pack that fails is said in the search's answer an
 
 ## The model call
 
-`@anthropic-ai/sdk`, `client.messages.stream(...)`: `model` from config (`claude-opus-5-5` default,
-`claude-sonnet-5-5` the other), no `thinking` parameter (adaptive is the model's default), `output_config:
-{ effort: config.effort }` (`medium` default), `max_tokens: config.maxOutputTokens` (4096), `betas:
-["server-side-fallback-2026-07-01"]` with `fallbacks: "default"` through the beta client when
-`config.refusalFallback` is true (default true). With the rulebooks, `tools` as above; a reply that stops on
+`@anthropic-ai/sdk`, `client.messages.stream(...)`: `model` from config (`claude-haiku-5-5` default, a hobby
+table's pocket: about a twentieth of Sonnet's price; `claude-sonnet-5-5` and `claude-opus-5-5` priced too), no
+`thinking` parameter (adaptive is the model's default), `output_config: { effort: config.effort }` (`high`
+default), `max_tokens: config.maxOutputTokens` (16000: the model's thinking counts against it, and a high effort
+can think through 4,096 before it says a word), `betas: ["server-side-fallback-2026-07-01"]` with `fallbacks:
+"default"` through the beta client when `config.refusalFallback` is true (default false: Haiku has no
+server-side fallback; true for Sonnet or Opus). With the rulebooks, `tools` as above; a reply that stops on
 `tool_use` has its calls run, and the next hop carries the assistant's content whole (thinking included) and a
 `tool_result` per call (`is_error` for a refused or failed one), up to `config.lookupRounds` (4) rounds and
 `config.lookupCalls` (8) calls, the hop after the last round sent with `tool_choice: { type: "none" }`. A hop the
 fallback model served goes on with that model. The stored answer is every hop's words joined by a blank line. The response `usage` fields `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens` make the ledger line, priced by
-`config.prices[model]` (per MTok: `input`, `cacheWrite5m`, `cacheWrite1h`, `cacheRead`, `output`).
+`config.prices[model]` (per MTok: `input`, `cacheWrite5m`, `cacheWrite1h`, `cacheRead`, `output`); a cache write
+is priced at the TTL it was made with, from the response's `cache_creation` split, or at the dearer of the two
+configured TTLs when a response gives none. A model priced by prompt length (Haiku) carries `longPrompt: {
+overTokens, input, cacheWrite5m, cacheWrite1h, cacheRead, output }`: a request whose prompt (input, cache writes
+and cache reads together) is over `overTokens` is priced at those rates, each hop on its own.
 
 **Stub mode** (`MODEL_STUB=1`, or no `ANTHROPIC_API_KEY` set): no API call. The answer is deterministic so a live
 check can assert on it:
@@ -198,8 +211,11 @@ cacheRead: 0, output: <estimate> }`, cost 0, model `"stub"`. The token estimate 
 
 `perUserHour: 10`, `perUserDay: 40`, `tableDayUsd: 5`, `tableMonthUsd: 25`, `messageChars: 4000`,
 `sittingTurns: 24`, `gazeBudgetTokens: 120000` (past it: the oldest lore pages by entry sort are replaced by their
-titles until under budget, and a warning is logged), `callTimeoutMs: 60000` (each hop of an answer),
-`lookupRounds: 4`, `lookupCalls: 8`. One message is one call against the caps, whatever its hops. Counters are per Foundry user id,
+titles until under budget, and a warning is logged), `callTimeoutMs: 90000` (each hop of an answer),
+`lookupRounds: 4`, `lookupCalls: 8`. `limitsByModel` names a model's own limits, merged over `limits` when it is
+`config.model`; `null` for `perUserHour` or `perUserDay` is no such cap. The committed table lifts both for
+`claude-haiku-5-5` (a question there costs a fraction of a cent) and leaves Sonnet and Opus at 10 and 40; the
+dollar caps stand for every model. One message is one call against the caps, whatever its hops. Counters are per Foundry user id,
 rolling hour and calendar day (local time of the box); the table's day and month are calendar, from the ledger.
 
 ## Storage

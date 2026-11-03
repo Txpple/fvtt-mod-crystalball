@@ -93,7 +93,8 @@
     "status": {
       "loading": "Gazing…",
       "dark": "Dark",
-      "count": "{n} of {max} today"
+      "count": "{n} of {max} today",
+      "countUncapped": "{n} today"
     },
     "newSitting": "New sitting",
     "newSittingHint": "Close this sitting (the DM keeps it) and start a fresh one",

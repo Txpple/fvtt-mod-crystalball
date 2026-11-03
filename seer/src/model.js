@@ -1,7 +1,8 @@
 /**
  * The model call, per the contract's *The model call*: `messages.stream` with the gaze as four
- * system blocks (an explicit cache marker on the first three, the request's top-level automatic
- * marker for the conversation tail, the fourth), effort from config, no `thinking` parameter (the
+ * system blocks (an explicit cache marker on the first three, the stable TTL on the instructions
+ * and the lore and the other on the party; the request's top-level automatic marker, at the other
+ * TTL, for the own layer and the conversation tail), effort from config, no `thinking` parameter (the
  * Claude 5.5 models think adaptively by default and take no other setting) and no prefill. With
  * `refusalFallback` the call goes through the beta client with the API's server-side fallback, so
  * a request the model declines on policy grounds is re-run on the API's default fallback model
@@ -35,16 +36,26 @@ export function stubAnswer(meta, message) {
   );
 }
 
-/** The cache marker for the configured TTL (the 5-minute default carries no `ttl`). */
+/** The cache marker for a TTL (the 5-minute default carries no `ttl`). */
 export const cacheMarker = ttl =>
   ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
 
-/** The four system blocks: a marker on each of the first three. */
-export function systemBlocks(layers, ttl) {
+/** The dearer of the two configured TTLs: a write's price when a response gives no split. */
+export const dearestTtl = config =>
+  config?.stableCacheTtl === "1h" || config?.cacheTtl === "1h" ? "1h" : "5m";
+
+/**
+ * The four system blocks: a marker on each of the first three, the stable TTL on the first two
+ * (the instructions and the lore, the bulk of the gaze and the same for the whole table) and the
+ * other on the third (the party, which changes with every hit point); the fourth, the own layer,
+ * is cached with the conversation by the request's top-level marker.
+ * @param {{ stableCacheTtl?: string, cacheTtl?: string }} config
+ */
+export function systemBlocks(layers, { stableCacheTtl = "5m", cacheTtl = "5m" } = {}) {
   return layers.map((l, i) => ({
     type: "text",
     text: l.text,
-    ...(i < 3 ? { cache_control: cacheMarker(ttl) } : {})
+    ...(i < 3 ? { cache_control: cacheMarker(i < 2 ? stableCacheTtl : cacheTtl) } : {})
   }));
 }
 
@@ -52,7 +63,8 @@ export function systemBlocks(layers, ttl) {
  * The request body, minus what the transport adds (`betas`, `fallbacks`). With `tools` (the
  * rulebooks' two, the same bytes for the whole table, so they cache ahead of the first system
  * block) the model may look things up; `final` lets it answer only, the lookups spent.
- * @param {{ model: string, effort: string, maxOutputTokens: number, cacheTtl: string }} config
+ * @param {{ model: string, effort: string, maxOutputTokens: number, stableCacheTtl: string,
+ *   cacheTtl: string }} config
  * @param {{ tools?: object[] | null, final?: boolean, model?: string }} [options]
  */
 export function requestParams(
@@ -64,7 +76,7 @@ export function requestParams(
   return {
     model: model ?? config.model,
     max_tokens: config.maxOutputTokens,
-    system: systemBlocks(layers, config.cacheTtl),
+    system: systemBlocks(layers, config),
     ...(tools?.length ? { tools, ...(final ? { tool_choice: { type: "none" } } : {}) } : {}),
     messages,
     // Top-level automatic caching marks the last cacheable block, the newest message, so a
@@ -86,10 +98,14 @@ export function usageOf(usage) {
 
 /**
  * A call's cost in dollars from the config's per-MTok prices. A cache write is priced at the
- * TTL it was made with; the usage's own split by TTL is used when the response gives one.
+ * TTL it was made with; the usage's own split by TTL is used when the response gives one. A
+ * request whose prompt passes `longPrompt.overTokens` is priced at `longPrompt`'s rates.
  */
-export function costOf(usage, rawUsage, prices, ttl) {
-  if (!prices) return 0;
+export function costOf(usage, rawUsage, base, ttl) {
+  if (!base) return 0;
+  // A model priced by prompt length (Haiku): the whole request at the dearer rates past the line.
+  const prompt = usage.input + usage.cacheWrite + usage.cacheRead;
+  const prices = base.longPrompt && prompt > base.longPrompt.overTokens ? base.longPrompt : base;
   const split = rawUsage?.cache_creation;
   const write1h = split
     ? (split.ephemeral_1h_input_tokens ?? 0)
@@ -118,11 +134,12 @@ export function priceUsage(raw, served, config) {
     : [];
   if (hops.length) {
     return hops.reduce(
-      (sum, h) => sum + costOf(usageOf(h), h, prices[h.model] ?? prices[served], config.cacheTtl),
+      (sum, h) =>
+        sum + costOf(usageOf(h), h, prices[h.model] ?? prices[served], dearestTtl(config)),
       0
     );
   }
-  return costOf(usageOf(raw), raw, prices[served], config.cacheTtl);
+  return costOf(usageOf(raw), raw, prices[served], dearestTtl(config));
 }
 
 /** The text blocks of a final message, joined. */
@@ -203,7 +220,7 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
       };
       return {
         usage,
-        cost: costOf(usage, null, config.prices?.[served], config.cacheTtl),
+        cost: costOf(usage, null, config.prices?.[served], dearestTtl(config)),
         model: served,
         estimated: true
       };
@@ -240,7 +257,7 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
         const res = await anthropic.messages.countTokens(
           {
             model: config.model,
-            system: systemBlocks(layers, config.cacheTtl),
+            system: systemBlocks(layers, config),
             messages: [{ role: "user", content: "." }]
           },
           { signal: AbortSignal.timeout(10000), maxRetries: 0 }

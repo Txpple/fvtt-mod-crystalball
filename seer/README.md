@@ -61,22 +61,28 @@ sentence, which names what the gaze holds, so a live check can assert on it for 
 
 ## The model call
 
-`claude-opus-5-5` by default (`claude-sonnet-5-5` the other choice in `config.json`), `output_config.effort` medium,
-4,096 output tokens, no `thinking` parameter, streamed. The four layers are the system prompt: an explicit
+`claude-haiku-5-5` by default at `output_config.effort` high, a fraction of a cent a question (`claude-sonnet-5-5`
+and `claude-opus-5-5` are priced in `config.json` too; with either, turn `refusalFallback` on, which Haiku does not
+support), 16,000 output tokens (the thinking counts against them), no `thinking` parameter, streamed. The four
+layers are the system prompt: an explicit
 `cache_control` marker on the first three and the request's top-level automatic marker for the conversation, so a
-sitting's next message reads the cached gaze and history. With `refusalFallback` on, the call goes through the
+sitting's next message reads the cached gaze and history. The markers carry two TTLs: `stableCacheTtl` (an hour
+by default) on the instructions and the lore, the bulk of the gaze and the same for the whole table, so a
+player's questions over an evening write them once; `cacheTtl` (five minutes) on the party, the own sheet and
+the conversation, which change with every hit point and turn. With `refusalFallback` on, the call goes through the
 beta client with `fallbacks: "default"`, so a request the model declines on policy grounds is answered by the API's
 fallback model in the same call. With the rulebooks the tools ride ahead of the first system block (the same
 bytes for the whole table, so they cache with the instructions); a round of tool calls is run and its results go
 back, at most `lookupRounds` rounds and `lookupCalls` calls an answer, the last hop answering only. Each hop has
 `callTimeoutMs` of its own, and the usage and cost are every hop's. Prices per million tokens are in
-`config.json` and make the ledger's cost.
+`config.json` and make the ledger's cost; Haiku's `longPrompt` rates price a request whose prompt passes 100,000
+tokens, as the API bills it.
 
 ## Configuration
 
 The environment only: `seer/.env` on a sandbox (passed by `npm run seer:dev`), the unit's `EnvironmentFile=` on a
 box. The variables are the contract's *Environment* table. `config.json` holds the committed defaults (model,
-effort, output cap, cache TTL, the refusal fallback, the limits, the prices, the sitting retention, the call
+effort, output cap, the two cache TTLs, the refusal fallback, the limits, the prices, the sitting retention, the call
 timeout); `CONFIG` may name another file whose keys override them. Relative `DATA_DIR` and `CONFIG` paths are taken
 from the repository root; on a box give absolute ones. A config file written with a byte-order mark (Windows
 PowerShell's) is read as well.

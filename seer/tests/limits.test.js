@@ -116,6 +116,26 @@ describe("decide", () => {
   });
 });
 
+describe("no question caps", () => {
+  const OPEN = { ...LIMITS, perUserHour: null, perUserDay: null };
+  it("never refuses for a user's hour or day, and reports no remaining", () => {
+    const now = at(2026, 11, 2, 21);
+    const many = calls(500, "u1", at(2026, 11, 2, 20, 30), 1000);
+    expect(decide({ limits: OPEN, calls: many, userId: "u1", message: "x", now })).toBeNull();
+    const r = usageReport({ limits: OPEN, calls: many, userId: "u1", now });
+    expect(r.remaining).toEqual({ hour: null, day: null });
+    expect(r.limits.perUserDay).toBeNull();
+    expect(r.user.day).toBe(500);
+  });
+  it("still holds the table to its dollars", () => {
+    const now = at(2026, 11, 2, 21);
+    const spent = calls(5, "u1", at(2026, 11, 2, 20), MIN, 1);
+    expect(
+      decide({ limits: OPEN, calls: spent, userId: "u1", message: "x", now })?.body.scope
+    ).toBe("table-day");
+  });
+});
+
 describe("usageReport", () => {
   it("counts the user's hour and day and the table's day and month", () => {
     const now = at(2026, 11, 2, 12, 0);

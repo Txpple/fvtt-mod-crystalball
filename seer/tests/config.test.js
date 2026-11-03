@@ -20,38 +20,57 @@ afterEach(() => {
 describe("the committed config", () => {
   it("holds the contract's defaults", () => {
     expect(loadConfig(DEFAULTS_FILE)).toEqual({
-      model: "claude-opus-5-5",
-      effort: "medium",
-      maxOutputTokens: 4096,
+      model: "claude-haiku-5-5",
+      effort: "high",
+      maxOutputTokens: 16000,
+      stableCacheTtl: "1h",
       cacheTtl: "5m",
-      refusalFallback: true,
-      callTimeoutMs: 60000,
+      refusalFallback: false,
+      callTimeoutMs: 90000,
       lookupRounds: 4,
       lookupCalls: 8,
       sittingRetentionDays: 90,
       limits: {
-        perUserHour: 10,
-        perUserDay: 40,
+        perUserHour: null,
+        perUserDay: null,
         tableDayUsd: 5,
         tableMonthUsd: 25,
         messageChars: 4000,
         sittingTurns: 24,
         gazeBudgetTokens: 120000
       },
+      limitsByModel: {
+        "claude-haiku-5-5": { perUserHour: null, perUserDay: null }
+      },
       prices: {
+        "claude-haiku-5-5": {
+          input: 0.1,
+          cacheWrite5m: 0.125,
+          cacheWrite1h: 0.2,
+          cacheRead: 0.01,
+          output: 0.5,
+          longPrompt: {
+            overTokens: 100000,
+            input: 0.5,
+            cacheWrite5m: 0.625,
+            cacheWrite1h: 1,
+            cacheRead: 0.05,
+            output: 2.5
+          }
+        },
+        "claude-sonnet-5-5": {
+          input: 2,
+          cacheWrite5m: 2.5,
+          cacheWrite1h: 4,
+          cacheRead: 0.1,
+          output: 10
+        },
         "claude-opus-5-5": {
           input: 4,
           cacheWrite5m: 5,
           cacheWrite1h: 8,
           cacheRead: 0.2,
           output: 20
-        },
-        "claude-sonnet-5-5": {
-          input: 2,
-          cacheWrite5m: 2.5,
-          cacheWrite1h: 4,
-          cacheRead: 0.2,
-          output: 10
         }
       }
     });
@@ -73,6 +92,30 @@ describe("the committed config", () => {
     expect(config.prices["claude-opus-5-5"].input).toBe(4);
   });
 
+  it("runs Sonnet at the table's question caps and Haiku with none", () => {
+    const dir = tempDir("config");
+    dirs.push(dir);
+    const file = path.join(dir, "config.json");
+    fs.writeFileSync(file, JSON.stringify({ model: "claude-sonnet-5-5", refusalFallback: true }));
+    const sonnet = loadConfig(file);
+    expect(sonnet.limits.perUserHour).toBe(10);
+    expect(sonnet.limits.perUserDay).toBe(40);
+    fs.writeFileSync(file, JSON.stringify({ limits: { perUserHour: 60 } }));
+    const haiku = loadConfig(file);
+    expect(haiku.limits.perUserHour).toBeNull();
+    expect(haiku.limits.tableDayUsd).toBe(5);
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ model: "claude-opus-5-5", limits: { perUserDay: null } })
+    );
+    expect(loadConfig(file).limits.perUserDay).toBeNull();
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ model: "claude-opus-5-5", limits: { messageChars: null } })
+    );
+    expect(() => loadConfig(file)).toThrow(/limits.messageChars/);
+  });
+
   it("refuses a config it cannot run", () => {
     const dir = tempDir("config");
     dirs.push(dir);
@@ -81,9 +124,21 @@ describe("the committed config", () => {
     expect(() => loadConfig(file)).toThrow(/effort, cacheTtl/);
   });
 
+  it("refuses the stable TTL shorter than the other, as the API would", () => {
+    const dir = tempDir("config");
+    dirs.push(dir);
+    const file = path.join(dir, "config.json");
+    fs.writeFileSync(file, JSON.stringify({ stableCacheTtl: "5m", cacheTtl: "1h" }));
+    expect(() => loadConfig(file)).toThrow(/stableCacheTtl \(shorter than cacheTtl\)/);
+    fs.writeFileSync(file, JSON.stringify({ stableCacheTtl: "5m" }));
+    expect(loadConfig(file).stableCacheTtl).toBe("5m");
+    fs.writeFileSync(file, JSON.stringify({ stableCacheTtl: "2h" }));
+    expect(() => loadConfig(file)).toThrow(/stableCacheTtl$/);
+  });
+
   it("falls back to the defaults when the CONFIG file is missing", () => {
     expect(loadConfig(path.join(REPO_DIR, "seer", "no-such-config.json")).model).toBe(
-      "claude-opus-5-5"
+      "claude-haiku-5-5"
     );
   });
 });
@@ -196,7 +251,13 @@ describe("a box's configuration", () => {
     const dir = tempDir("config");
     dirs.push(dir);
     const file = path.join(dir, "config.json");
-    fs.writeFileSync(file, JSON.stringify({ limits: { perUserHour: 0, perUserDay: 1.5 } }));
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        model: "claude-sonnet-5-5",
+        limits: { perUserHour: 0, perUserDay: 1.5 }
+      })
+    );
     expect(() => loadConfig(file)).toThrow(/limits\.perUserHour, limits\.perUserDay/);
     fs.writeFileSync(file, JSON.stringify({ limits: { tableDayUsd: 0 } }));
     expect(loadConfig(file).limits.tableDayUsd).toBe(0);

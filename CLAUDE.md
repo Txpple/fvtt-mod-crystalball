@@ -97,7 +97,36 @@ launcher's Seer on the real model, the GM page's window lit by the companion por
 through the reusable workflow (the annotated `v1.0.5`, `latest` serving it), installed on prod through the installer with no
 player connected (PASS, 18/18 served files byte-identical with the zip), the box's Seer at `v1.0.5` by the guide's Updating
 over Tailscale SSH (its browser check passed by the user), "foundry: connected" at once, `healthz` 1.0.5 and a forged id 401
-through the public hostname; the sandbox runs the same 1.0.5 files, deployed `--local` before the walk.
+through the public hostname; the sandbox runs the same 1.0.5 files, deployed `--local` before the walk. **Unreleased
+on `main`: the cache split** (the user, on the sandbox's daily cap tripped by a test day: "how can we optimze costs",
+then "Yes, make it"). Measured first on the sandbox's ledger: 29 real calls, $5.27 on Opus, $4.02 of it ten cold
+writes of the gaze after lulls past the five-minute cache (the same tokens $2.64 on Sonnet 5.5, $0.14 on Haiku 5.5);
+a player's gaze 48k tokens, the lore 37k of it (the Session Diary 16.7k, the handouts 11.3k), the party layer
+carrying every member's hit points. Now the markers carry two TTLs: `stableCacheTtl` (`1h`) on the instructions and
+the lore, the bulk of the gaze and the DM's alone to change; `cacheTtl` (`5m`) on the party and the top-level
+marker, which change with every blow and turn. A stable TTL shorter than the other is refused at start, as the API
+would; a write without the response's `cache_creation` split is priced at the dearer TTL; Sonnet's cache-read price
+corrected to $0.10. `verify` green (380 tests); a probe of the request shape on Haiku took the mixed markers and
+split the write (73k at 1h, 66k at 5m), the second call reading all of it; the sandbox's Seer bounced alone (its pid
+ended, the launcher's `start`) and up on the new config. No sitting on the real model through the Seer since (the
+day's cap stood); not released, prod on 1.0.5. The sandbox's Seer then moved, on the user's word ("id like to
+test at sonnet low"), to Sonnet 5.5 at low effort with a $10 day cap, through a gitignored override
+(`seer/data/config.sandbox.json`, named by `CONFIG` in `seer/.env`); the ledger untouched, prod's config the committed
+defaults. Then Haiku 5.5 at low effort ("let me try haiku"): its prices in the override (the committed config has
+none, and an unpriced model costs 0 against the caps) and `refusalFallback` off (Haiku has no server-side fallback). The user then tried Haiku at max (cut off: the thinking
+spent the 4,096-token cap before a word), xhigh and high ("haiku high isnt bad"), Sonnet low and Opus medium again on
+the same questions ("sonnet low is clearly better tho", but "for a hobby, i think haiku is better since it comes
+out of my pocket"), and settled: "lets settle on haiku". **The committed defaults now** (unreleased): Haiku 5.5 at
+high, `refusalFallback` false, 16,000 output tokens, `callTimeoutMs` 90000, Haiku priced with its `longPrompt` rates
+(a request past 100,000 prompt tokens at five times, as the API bills); Sonnet and Opus priced still. `verify` green
+(381 tests); the sandbox override cut to its raised caps (a $10 day, 60 an hour, 200 a day per player), so the
+sandbox runs the committed model; the Seer bounced alone, `healthz` naming Haiku. Measured on the sandbox: 18 Haiku
+questions $0.055, 0.1 to 0.3 cents each, 3 to 16 s at high; the same tokens about $0.93 on Sonnet low. Then, on the
+user's word ("if we are on sonnet, the current limits on questions per hour/per day stand. if we are on haiku, it
+can be unlimited"), a limits table by model: `limitsByModel` merged over `limits` for the configured model, `null`
+for a user's hour or day no cap; Haiku's entry lifts both, Sonnet and Opus keep 10 and 40, the dollar caps stand for
+every model; `usage/me` and `done` carry `null` for no cap and the window shows *n today*. `verify` green (384
+tests); deployed `--local`, byte-identical; the sandbox's override down to its $10 day.
 
 ## The rules this module keeps
 

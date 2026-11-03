@@ -49,10 +49,18 @@ export function loadConfig(configPath, defaultsPath = DEFAULTS_FILE) {
     if (fs.existsSync(configPath)) config = merge(defaults, readJson(configPath));
     else log.warn("config: the CONFIG file does not exist; using the defaults");
   }
+  // The model's own limits over the table's: `config.limits` is what this model runs under.
+  const byModel = config.limitsByModel?.[config.model];
+  if (byModel && typeof byModel === "object")
+    config = { ...config, limits: { ...config.limits, ...byModel } };
   const problems = [];
   if (typeof config.model !== "string" || !config.model) problems.push("model");
   if (!EFFORTS.includes(config.effort)) problems.push("effort");
   if (!["5m", "1h"].includes(config.cacheTtl)) problems.push("cacheTtl");
+  if (!["5m", "1h"].includes(config.stableCacheTtl)) problems.push("stableCacheTtl");
+  // The API takes the longer TTL first, and the stable layers come first in the prompt.
+  else if (config.stableCacheTtl === "5m" && config.cacheTtl === "1h")
+    problems.push("stableCacheTtl (shorter than cacheTtl)");
   if (!(config.maxOutputTokens > 0)) problems.push("maxOutputTokens");
   // Lookups per answer: 0 rounds lets the model answer without them although the tools are given.
   for (const k of ["lookupRounds", "lookupCalls"]) {
@@ -60,7 +68,8 @@ export function loadConfig(configPath, defaultsPath = DEFAULTS_FILE) {
       problems.push(k);
   }
   // A count of 0 would refuse every message with no wait to name, so counts start at 1; a
-  // dollar ceiling of 0 is a deliberate off switch and is allowed.
+  // dollar ceiling of 0 is a deliberate off switch and is allowed. A user's hour and day may be
+  // null, no cap at all.
   for (const k of [
     "perUserHour",
     "perUserDay",
@@ -68,8 +77,9 @@ export function loadConfig(configPath, defaultsPath = DEFAULTS_FILE) {
     "sittingTurns",
     "gazeBudgetTokens"
   ]) {
-    if (!(Number.isInteger(config.limits?.[k]) && config.limits[k] >= 1))
-      problems.push(`limits.${k}`);
+    const v = config.limits?.[k];
+    if (v === null && (k === "perUserHour" || k === "perUserDay")) continue;
+    if (!(Number.isInteger(v) && v >= 1)) problems.push(`limits.${k}`);
   }
   for (const k of ["tableDayUsd", "tableMonthUsd"]) {
     if (!(Number(config.limits?.[k]) >= 0)) problems.push(`limits.${k}`);

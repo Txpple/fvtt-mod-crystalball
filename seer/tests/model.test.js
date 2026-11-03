@@ -3,6 +3,7 @@ import {
   cacheMarker,
   costOf,
   createModel,
+  dearestTtl,
   EMPTY_TEXT,
   FALLBACK_BETA,
   priceUsage,
@@ -18,6 +19,7 @@ const CONFIG = {
   model: "claude-opus-5-5",
   effort: "low",
   maxOutputTokens: 2048,
+  stableCacheTtl: "1h",
   cacheTtl: "5m",
   refusalFallback: true,
   callTimeoutMs: 60000,
@@ -177,14 +179,21 @@ describe("the stub", () => {
 });
 
 describe("the request", () => {
-  it("puts the gaze in four system blocks, a cache marker on the first three", () => {
-    const blocks = systemBlocks(layers, "5m");
+  it("puts the gaze in four system blocks, two markers at the stable TTL, one at the other", () => {
+    const blocks = systemBlocks(layers, CONFIG);
     expect(blocks.map(b => b.text)).toEqual(layers.map(l => l.text));
-    expect(
-      blocks.slice(0, 3).every(b => b.type === "text" && b.cache_control?.type === "ephemeral")
-    ).toBe(true);
-    expect(blocks[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(blocks.every(b => b.type === "text")).toBe(true);
+    expect(blocks.slice(0, 2).map(b => b.cache_control)).toEqual(
+      Array(2).fill({ type: "ephemeral", ttl: "1h" })
+    );
+    expect(blocks[2].cache_control).toEqual({ type: "ephemeral" });
     expect(blocks[3].cache_control).toBeUndefined();
+    // Five minutes on both: no marker carries a ttl.
+    expect(
+      systemBlocks(layers, { stableCacheTtl: "5m", cacheTtl: "5m" })
+        .slice(0, 3)
+        .map(b => b.cache_control)
+    ).toEqual(Array(3).fill({ type: "ephemeral" }));
   });
 
   it("asks for top-level automatic caching, low effort, the output cap and no thinking", () => {
@@ -192,7 +201,7 @@ describe("the request", () => {
     expect(p).toEqual({
       model: "claude-opus-5-5",
       max_tokens: 2048,
-      system: systemBlocks(layers, "5m"),
+      system: systemBlocks(layers, CONFIG),
       messages,
       cache_control: { type: "ephemeral" },
       output_config: { effort: "low" }
@@ -207,6 +216,20 @@ describe("the request", () => {
     expect(p.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
     expect(p.system.slice(0, 3).map(b => b.cache_control)).toEqual(
       Array(3).fill({ type: "ephemeral", ttl: "1h" })
+    );
+  });
+
+  it("prices a write at the dearer TTL when a response gives no split", () => {
+    expect(dearestTtl(CONFIG)).toBe("1h");
+    expect(dearestTtl({ stableCacheTtl: "5m", cacheTtl: "5m" })).toBe("5m");
+    const raw = { input_tokens: 100, cache_creation_input_tokens: 1000, output_tokens: 10 };
+    expect(priceUsage(raw, "claude-opus-5-5", CONFIG)).toBeCloseTo(
+      (100 * 4 + 1000 * 8 + 10 * 20) / 1e6,
+      12
+    );
+    expect(priceUsage(raw, "claude-opus-5-5", { ...CONFIG, stableCacheTtl: "5m" })).toBeCloseTo(
+      (100 * 4 + 1000 * 5 + 10 * 20) / 1e6,
+      12
     );
   });
 });
@@ -235,7 +258,7 @@ describe("a real call (a fake client)", () => {
     expect(pieces).toEqual(["Hello", " there."]);
     expect(result.text).toBe("Hello there.");
     expect(result.usage).toEqual({ input: 300, cacheWrite: 1000, cacheRead: 2000, output: 50 });
-    expect(result.cost).toBeCloseTo((300 * 4 + 1000 * 5 + 2000 * 0.2 + 50 * 20) / 1e6, 12);
+    expect(result.cost).toBeCloseTo((300 * 4 + 1000 * 8 + 2000 * 0.2 + 50 * 20) / 1e6, 12);
     expect(result.model).toBe("claude-opus-5-5");
     expect(model.id).toBe("claude-opus-5-5");
   });
@@ -302,7 +325,7 @@ describe("a real call (a fake client)", () => {
       onDelta: () => {}
     });
     expect(result.model).toBe("claude-sonnet-5-5");
-    expect(result.cost).toBeCloseTo((300 * 2 + 1000 * 2.5 + 2000 * 0.2 + 50 * 10) / 1e6, 12);
+    expect(result.cost).toBeCloseTo((300 * 2 + 1000 * 4 + 2000 * 0.2 + 50 * 10) / 1e6, 12);
   });
 
   it("counts the gaze with count_tokens once per set of layer hashes", async () => {
@@ -345,6 +368,34 @@ describe("usage and cost", () => {
     );
     expect(costOf(usage, {}, undefined, "5m")).toBe(0);
   });
+
+  it("prices a request past the long-prompt line at the dearer rates, the whole request", () => {
+    const haiku = {
+      input: 0.1,
+      cacheWrite5m: 0.125,
+      cacheWrite1h: 0.2,
+      cacheRead: 0.01,
+      output: 0.5,
+      longPrompt: {
+        overTokens: 100000,
+        input: 0.5,
+        cacheWrite5m: 0.625,
+        cacheWrite1h: 1,
+        cacheRead: 0.05,
+        output: 2.5
+      }
+    };
+    const under = { input: 4, cacheWrite: 1000, cacheRead: 98996, output: 2000 };
+    expect(costOf(under, {}, haiku, "5m")).toBeCloseTo(
+      (4 * 0.1 + 1000 * 0.125 + 98996 * 0.01 + 2000 * 0.5) / 1e6,
+      12
+    );
+    const over = { ...under, cacheRead: 98997 };
+    expect(costOf(over, {}, haiku, "5m")).toBeCloseTo(
+      (4 * 0.5 + 1000 * 0.625 + 98997 * 0.05 + 2000 * 2.5) / 1e6,
+      12
+    );
+  });
 });
 
 describe("what an unfinished call spent", () => {
@@ -364,7 +415,7 @@ describe("what an unfinished call spent", () => {
     const model = createModel({ config: CONFIG, log: quietLog(), client });
     const err = await call(model).catch(e => e);
     expect(err.spend.usage).toEqual({ input: 300, cacheWrite: 1000, cacheRead: 2000, output: 100 });
-    expect(err.spend.cost).toBeCloseTo((300 * 4 + 1000 * 5 + 2000 * 0.2 + 100 * 20) / 1e6, 12);
+    expect(err.spend.cost).toBeCloseTo((300 * 4 + 1000 * 8 + 2000 * 0.2 + 100 * 20) / 1e6, 12);
     expect(err.spend.estimated).toBe(false);
   });
 
