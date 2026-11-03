@@ -19,9 +19,8 @@ player's first call read the DM's lore and party layers and wrote only his own 8
 effort medium and instructions version 2 (the ball may make suggestions, grounded in the sections and marked
 as its own), and the connect error's reason named (a refused `localhost` is an AggregateError with an empty
 message). The ball's user *Crystal Ball* (role Player) exists on the sandbox, made by `tools/ball-user.mjs`, its
-password in `seer/.env`; the module is deployed `--local`, enabled and registered there; the sandbox's Service
-URL setting is `http://localhost:30001/crystalball`; the Seer runs from a terminal there (`npm run seer:dev`;
-PowerShell wants `npm.cmd`), never as a service. The name is free (the setup screen's `getPackages`, 7,089
+password in `seer/.env`; the module is deployed `--local`, enabled and registered there (how its Seer runs
+there and its Service URL: 1.0.4, below). The name is free (the setup screen's `getPackages`, 7,089
 modules, has no "Crystal Ball" and no `crystalball`); on GitHub since 2026-11-02 (`Txpple/fvtt-mod-crystalball`,
 `main` pushed, `sync` on in the suite's `repos.json`, every companion's family section carrying it). **1.0.0
 released and on prod the same day**: the annotated `v1.0.0` built by the reusable workflow, `latest` serving it;
@@ -46,8 +45,7 @@ classes can cast it?" --expect-lookup` GREEN on the real model: the window showe
 the answer in 15 seconds, two lookups, $0.38, nearly all of it the first write of a 66k-token gaze (the lookups'
 extra hops about three cents). Released through the reusable workflow, installed on prod through the installer
 (18/18 served files byte-identical), the box's Seer at `v1.0.2` by the guide's Updating, `healthz` 1.0.2 and a
-forged id 401 through the public hostname; the user tested it on prod ("i tested looks good"). The sandbox has 1.0.2's files `--local`,
-its manifest reading 1.0.1 until a restart; no Seer runs there now. Measured on the copies: a search answers in
+forged id 401 through the public hostname; the user tested it on prod ("i tested looks good"). Measured on the copies: a search answers in
 about 250 to 380 tokens, a read in 40 to 1,100 (a long Heroes of Faerûn region page about 3,800); the tool
 definitions add about 350 tokens to the cached prefix. **1.0.3 the same evening**, on the user's word ("for arcana
 unleashed, i want chapter 5, chapter 6, appendix, and bestiary excluded"), Arcana Unleashed's Chapter 5 (magic
@@ -57,13 +55,40 @@ Worlds too"), each by a line scoped to that book (`dnd-arcana-unleashed: Chapter
 a Chapter 3, 5 and 6 of its own; its bestiary was never read (actor packs are refused).
 Checked against the copied packs; released ("you can then release and put on prod"), installed on prod through the
 installer (18/18 served files byte-identical), the box's Seer at `v1.0.3`, `healthz` 1.0.3 and a forged id 401
-through the public hostname; prod's world has no saved rulebook settings, so a GM page reads the new defaults.
+through the public hostname; prod's world has no saved rulebook settings, so a GM page reads the new defaults. **1.0.4 on `main`, unreleased: the sandbox's ball made reliable** (the user: "crystal ball is not
+working on sandbox again", then "just fix this shit so we dont have issues like this all the time on sandbox. no
+terminal dependencies on this?", "do a long diag and figure out a long term solution why this fails on the windows
+sandbox"). The ball had gone dark there five ways in one day: the Seer died with the session's terminal that ran it;
+a mirror reset the Service URL to prod's and the files to prod's release; a stale process held the port; a dark
+window never asked again; and a browser on another device on the network (Foundry's log: a login from a LAN address
+while the day's others came from the machine itself) read `localhost:30001` as itself, while the Seer bound
+127.0.0.1 and allowed one origin. Now the window searches for the Seer (`serviceCandidates`): the Service URL's
+base, then, when that is a path on the page's own origin, the same path on **the companion port**, 30001 of the host
+the browser reached Foundry by; the first `healthz` that answers is the Seer for every later call, and a dark window
+asks again every ten seconds. The Seer's `CORS_ORIGIN` takes one origin, a list, or `*`; its reconnect backoff
+caps at fifteen seconds (it had reached a minute, and the ball stayed dark a minute after a Foundry restart). The
+sandbox: `seer/.env` with `BIND=::` and `CORS_ORIGIN=*`, the Service URL back at the default `/crystalball`, and the
+Seer as the Task Scheduler task *Open Roll 5e Crystal Ball Seer*, installed by `tools/sandbox-seer.mjs install` (a
+hidden PowerShell runs the tool's supervisor, which starts the Seer again whenever it exits; at each logon and on
+demand; the log `seer/data/seer.log`; an unelevated account may register no boot trigger and no S4U logon, both
+refused), never from a terminal; `tools/sandbox-service-url.mjs` folded into `sandbox-seer.mjs url --default`.
+Checked: `healthz` on 127.0.0.1, ::1, the Wi-Fi and the Tailscale address; a preflight from a LAN origin answered
+`*`; no window among the task's three processes; `stop` and `start` through the task; the Seer rejoining after
+`local-foundry.mjs restart --force`; `verify` green (377 tests); 1.0.4 deployed `--local`, byte-identical, the
+manifest 1.0.4 after that restart; `tools/live-check.mjs --walk --default-url` GREEN on the real model, the GM page's
+window lit by the companion port and Kartor's answer in 5 s. Release and prod wait for the user's word. Known: the
+MCP's restart and mirror guards count the ball's user among connected users (prod's `/api/status` reads 1 with the
+box's Seer up), so the local restart needed `--force` and a mirror from prod will refuse until the MCP's guards
+discount it.
 
 ## The rules this module keeps
 
 - **The window talks only to the Seer, the Seer only to Foundry and the model.** No client holds a key or calls
-  the model; the Seer binds `127.0.0.1` and is reached through a reverse proxy or tunnel rule on Foundry's own
-  origin (prod) or on a second local port with CORS for one origin (the sandbox). `docs/seer-contract.md` is the
+  the model; on a box the Seer binds `127.0.0.1` and is reached through a reverse proxy or tunnel rule on
+  Foundry's own origin (prod); on a sandbox it binds every address and the window finds it on **the companion
+  port**, 30001 of whatever host the browser reached Foundry by, with CORS for the sandbox's origins
+  (`CORS_ORIGIN`: one, a list, or `*`), so a sandbox keeps the default Service URL and a mirror cannot darken it.
+  `docs/seer-contract.md` is the
   contract: endpoints, the `X-Foundry-Session` header, the SSE events, the error bodies, the settings the Seer
   reads, the gaze's layers, the stub model's sentence. A change to it is made there first.
 - **Identity is Foundry's.** Every request carries the player's own session id; the Seer opens a socket to Foundry
@@ -135,8 +160,10 @@ through the public hostname; prod's world has no saved rulebook settings, so a G
   `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (versioned), `log.js`;
   `seer/config.json` the defaults; `seer/tests/` with synthetic fixtures under `fixtures/<foundry version>/`;
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.
-- `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--asker <member>`);
-  `tools/fake-seer.mjs`: a stub-only stand-in Seer for the walk, never deployed; `tools/ball-user.mjs`: the ball's
-  user on a sandbox.
+- `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--default-url` for
+  the companion-port search, `--asker <member>`); `tools/fake-seer.mjs`: a stub-only stand-in Seer for the walk,
+  never deployed; `tools/ball-user.mjs`: the ball's user on a sandbox; `tools/sandbox-seer.mjs`: the Seer as a
+  Windows scheduled task on a sandbox (`install`, `status`, `start`, `stop`, `restart`, `log`, `uninstall`, `url`),
+  the one way the sandbox's Seer runs, never from a session's terminal.
 - **Identity in the window**: `game.socket.session.sessionId` first (Foundry 14's session cookie is HttpOnly), the
   cookie only for an older build; the walk asserts the two are equal.

@@ -1,6 +1,6 @@
 /**
  * The Seer's HTTP API, plain `node:http`: the contract's endpoints under BASE_PATH, CORS for the
- * one configured origin, JSON errors with the contract's bodies, and `POST chat` as Server-Sent
+ * configured origins, JSON errors with the contract's bodies, and `POST chat` as Server-Sent
  * Events. Every user endpoint runs the same chain before it reads a word of the world:
  *
  *   the X-Foundry-Session header → the link is up → Foundry's probe names the user → the module
@@ -27,6 +27,23 @@ export const KEEP_ALIVE_MS = 95000;
  * `healthz` reports it, so the DM can see when a server's UTC would reset players' days mid-session.
  */
 export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+
+/**
+ * `CORS_ORIGIN` read: empty is CORS off (prod, one origin behind the tunnel); `*` is any origin
+ * (a sandbox reached from other devices on the network, whose address the browser may give in
+ * several ways); otherwise the origins listed, comma- or space-separated. Any origin opens
+ * nothing: every endpoint but `healthz` wants the caller's own session id, which no other page
+ * holds.
+ * @param {string | undefined} value
+ * @returns {{ any: boolean, origins: Set<string> }}
+ */
+export function parseCorsOrigins(value) {
+  const words = String(value ?? "")
+    .split(/[\s,]+/)
+    .map(w => w.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  return { any: words.includes("*"), origins: new Set(words.filter(w => w !== "*")) };
+}
 
 /** "/crystalball/" → "/crystalball"; "/" or "" → "" (no prefix). */
 export function normaliseBase(basePath) {
@@ -154,10 +171,15 @@ export function createServer({
   const tooLong = () =>
     new HttpError(413, { error: "too-long", limit: config.limits.messageChars });
 
-  const corsFor = req =>
-    corsOrigin && req.headers.origin === corsOrigin
-      ? { "Access-Control-Allow-Origin": corsOrigin, Vary: "Origin" }
+  const allowed = parseCorsOrigins(corsOrigin);
+  const corsFor = req => {
+    const origin = req.headers.origin;
+    if (typeof origin !== "string" || !origin) return {};
+    if (allowed.any) return { "Access-Control-Allow-Origin": "*" };
+    return allowed.origins.has(origin)
+      ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" }
       : {};
+  };
 
   const json = (res, status, body, cors) => {
     if (res.headersSent) return;

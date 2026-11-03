@@ -12,6 +12,15 @@ export const DEFAULT_SERVICE_URL = "/crystalball";
 export const MESSAGE_LIMIT = 4000;
 
 /**
+ * The companion port: where a Seer beside a Foundry with no proxy listens (the Seer's default
+ * `PORT`). A `serviceUrl` that is a bare path names Foundry's own origin, which a sandbox serves
+ * nothing at; the window then also tries the same path on this port of the page's own host, so a
+ * sandbox needs no Service URL at all, and one reached from another device on the network finds
+ * the Seer beside the Foundry it is talking to rather than on itself.
+ */
+export const COMPANION_PORT = 30001;
+
+/**
  * The `session` cookie's decoded value, or null. Split exactly as Foundry's `Game.getCookies()`
  * splits `document.cookie` (on "; " and then "="; a later cookie of the same name wins), so the
  * Seer is handed the very id Foundry's own socket presented.
@@ -52,6 +61,26 @@ export function serviceBase(serviceUrl, origin) {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+}
+
+/**
+ * Where the window looks for the Seer, in order: the Service URL's base, then, when that setting
+ * is a path on the page's own origin (the default, prod's), the same path on the companion port
+ * of the page's host. A setting that names another origin outright is tried alone. Empty when the
+ * setting names no http(s) service.
+ * @param {unknown} serviceUrl  the Service URL setting
+ * @param {{ origin: string, protocol: string, hostname: string, port: string }} location  the page's
+ * @returns {string[]}
+ */
+export function serviceCandidates(serviceUrl, location) {
+  const first = serviceBase(serviceUrl, location.origin);
+  if (!first) return [];
+  const bases = [first];
+  if (first.startsWith(`${location.origin}/`) && String(location.port) !== String(COMPANION_PORT)) {
+    const path = first.slice(location.origin.length);
+    bases.push(`${location.protocol}//${location.hostname}:${COMPANION_PORT}${path}`);
+  }
+  return bases;
 }
 
 /**

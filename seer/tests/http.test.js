@@ -8,6 +8,7 @@ import {
   HEARTBEAT_MS,
   KEEP_ALIVE_MS,
   normaliseBase,
+  parseCorsOrigins,
   timeZone
 } from "../src/http.js";
 import { createLedger } from "../src/ledger.js";
@@ -33,7 +34,15 @@ afterEach(() => {
   }
 });
 
-async function start({ w = world(), limits: caps = {}, model, probe, worldFn, library } = {}) {
+async function start({
+  w = world(),
+  limits: caps = {},
+  model,
+  probe,
+  worldFn,
+  library,
+  cors = ORIGIN
+} = {}) {
   const dir = tempDir("http");
   const log = quietLog();
   const state = { connected: true, worldOpen: true, world: "test-world", ballUser: "Crystal Ball" };
@@ -53,7 +62,7 @@ async function start({ w = world(), limits: caps = {}, model, probe, worldFn, li
   const sittings = createSittings({ dir, turnsWindow: config.limits.sittingTurns });
   const server = createServer({
     basePath: "/crystalball",
-    corsOrigin: ORIGIN,
+    corsOrigin: cors,
     link,
     model: model ?? createModel({ config, log }),
     limits,
@@ -181,6 +190,66 @@ describe("CORS", () => {
     expect(res.headers["access-control-allow-methods"]).toBe("GET, POST, OPTIONS");
     const other = await call(port, "chat", { method: "OPTIONS", origin: "https://elsewhere.test" });
     expect(other.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("answers each origin of a list, as it was given, and no other", async () => {
+    const { port } = await start({
+      cors: `${ORIGIN}, http://192.168.1.20:30000/ http://sandbox.local:30000`
+    });
+    for (const origin of [ORIGIN, "http://192.168.1.20:30000", "http://sandbox.local:30000"]) {
+      const res = await call(port, "healthz", { origin });
+      expect(res.headers["access-control-allow-origin"]).toBe(origin);
+      expect(res.headers.vary).toBe("Origin");
+    }
+    expect(
+      (await call(port, "healthz", { origin: "http://192.168.1.21:30000" })).headers[
+        "access-control-allow-origin"
+      ]
+    ).toBeUndefined();
+  });
+
+  it("answers any origin with * when told to, and a request with no Origin with nothing", async () => {
+    const { port } = await start({ cors: "*" });
+    expect(
+      (await call(port, "healthz", { origin: "https://elsewhere.test" })).headers[
+        "access-control-allow-origin"
+      ]
+    ).toBe("*");
+    const pre = await call(port, "chat", {
+      method: "OPTIONS",
+      origin: "http://192.168.1.20:30000"
+    });
+    expect(pre.status).toBe(204);
+    expect(pre.headers["access-control-allow-origin"]).toBe("*");
+    expect(pre.headers["access-control-allow-headers"]).toBe("Content-Type, X-Foundry-Session");
+    expect((await call(port, "healthz")).headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("is off with no origin configured", async () => {
+    const { port } = await start({ cors: "" });
+    expect(
+      (await call(port, "healthz", { origin: ORIGIN })).headers["access-control-allow-origin"]
+    ).toBeUndefined();
+  });
+});
+
+describe("parseCorsOrigins", () => {
+  it("reads one origin, a list, any, and nothing", () => {
+    expect(parseCorsOrigins("http://localhost:30000")).toEqual({
+      any: false,
+      origins: new Set(["http://localhost:30000"])
+    });
+    expect(parseCorsOrigins(" http://a:1/, http://b:2 ")).toEqual({
+      any: false,
+      origins: new Set(["http://a:1", "http://b:2"])
+    });
+    expect(parseCorsOrigins("*")).toEqual({ any: true, origins: new Set() });
+    expect(parseCorsOrigins("http://a:1 *")).toEqual({
+      any: true,
+      origins: new Set(["http://a:1"])
+    });
+    expect(parseCorsOrigins("")).toEqual({ any: false, origins: new Set() });
+    expect(parseCorsOrigins(undefined)).toEqual({ any: false, origins: new Set() });
   });
 });
 

@@ -19,10 +19,18 @@ it); the client takes the socket's copy first and falls back to a `session` cook
 (older builds); the two are the same value. No other authentication. No cookies are relied on.
 
 - prod: `serviceUrl` is the same-origin path `/crystalball` (the tunnel routes it to the Seer; no CORS).
-- sandbox: `serviceUrl` is `http://localhost:30001/crystalball` (the Seer's origin plus its `BASE_PATH`, the same
-  path on both so the two differ only by origin); the Seer answers CORS for the one `CORS_ORIGIN` (preflight
-  `OPTIONS`, `Access-Control-Allow-Origin: <origin>`, `Access-Control-Allow-Headers: Content-Type,
-  X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`).
+- a sandbox: `serviceUrl` stays at that default. The path names Foundry's own origin, which a sandbox with no
+  proxy serves nothing at, so the window also tries **the companion port**: the same path on port 30001 (the
+  Seer's default `PORT`) of the host the page reached Foundry by, `http://localhost:30001/crystalball` from the
+  machine itself and `http://<that host>:30001/crystalball` from another device on the network. The Seer there
+  binds every address (`BIND=::`) and answers CORS for the sandbox's origins (`CORS_ORIGIN`, one origin, a list
+  or `*`; preflight `OPTIONS`, `Access-Control-Allow-Origin: <the origin, or *>`, `Access-Control-Allow-Headers:
+  Content-Type, X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`). A `serviceUrl` that
+  names an origin outright is asked alone.
+- the window's search: `healthz` at each candidate in turn, the first that answers 200 is the Seer for every
+  later call (a Seer that answers but reports no link or no world is still it: the ball is dark for that reason).
+  No candidate answering, the ball is dark and the window asks again every ten seconds while it is open; a
+  change to `serviceUrl` starts the search over.
 
 All responses are JSON (`application/json`) except `POST chat`, which is `text/event-stream`.
 
@@ -206,9 +214,9 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
 | `BALL_USER` | `Crystal Ball` | the ball's user, by name or id |
 | `BALL_PASSWORD` | (none) | its password |
 | `PORT` | `30001` | the Seer's port |
-| `BIND` | `127.0.0.1` | the Seer's bind address |
+| `BIND` | `127.0.0.1` | the Seer's bind address; `::` (every address) on a sandbox other devices reach over the network |
 | `BASE_PATH` | `/crystalball` | the path prefix every endpoint sits under (`/crystalball/healthz`); `/` for none |
-| `CORS_ORIGIN` | (none → CORS off) | the one origin allowed (the sandbox: `http://localhost:30000`) |
+| `CORS_ORIGIN` | (none → CORS off) | the origins allowed: one (`http://localhost:30000`), several comma-separated, or `*` for any (a sandbox reached from other devices; every endpoint but `healthz` still wants the caller's own session id) |
 | `DATA_DIR` | systemd's `STATE_DIRECTORY` when set, else `seer/data` under the repo root | storage; on a box an absolute path or a `StateDirectory=` line in the unit |
 | `CONFIG` | `seer/config.json` | the config file (the committed defaults); another file's path, absolute on a box, relative to the repo root otherwise |
 | `LOG_LEVEL` | `info` | `debug` prints the gaze's layer sizes and cache hits per call |

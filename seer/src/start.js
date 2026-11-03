@@ -80,7 +80,7 @@ export async function start() {
   server.listen(env.port, env.bind, () => {
     log.info("seer: listening", {
       version,
-      at: `http://${env.bind}:${env.port}${env.basePath || "/"}`,
+      at: `http://${env.bind.includes(":") ? `[${env.bind}]` : env.bind}:${env.port}${env.basePath || "/"}`,
       model: model.id,
       cors: env.corsOrigin || "off",
       timeZone: timeZone(),

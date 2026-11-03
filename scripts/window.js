@@ -15,13 +15,19 @@ import { log, MODULE_ID, setting, t } from "./common.js";
 import { renderMarkdown } from "./decide/markdown.js";
 import { lookupLine } from "./decide/rulebooks.js";
 import { composeSaying } from "./decide/saying.js";
-import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceBase, sessionIdFrom, waitOf } from "./decide/session.js";
+import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceCandidates, sessionIdFrom, waitOf } from "./decide/session.js";
 import { createSseParser } from "./decide/sse.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /** A JSON call that has not answered by then never will: the window goes dark instead of hanging. */
 const CALL_TIMEOUT_MS = 15_000;
+
+/**
+ * A dark window asks again this often, so a Seer that comes up, or finds its world again, lights
+ * the ball without a click; the Retry button is the same ask, sooner.
+ */
+const DARK_RETRY_MS = 10_000;
 
 /**
  * The Seer gives the model a minute a hop, and an answer that looks rules up takes a hop per round
@@ -46,9 +52,17 @@ function sessionId() {
   return game.socket?.session?.sessionId ?? sessionIdFrom(document.cookie);
 }
 
-/** An endpoint's URL, or null when the Service URL setting names no http(s) service. */
-function endpoint(path) {
-  const base = serviceBase(setting("serviceUrl"), window.location.origin);
+/** The Seer's base the last probe settled on; null until one answers, and again when the setting changes. */
+let seerBase = null;
+
+/** Where the window looks for the Seer, in the contract's order (the setting, then the companion port). */
+const candidates = () => serviceCandidates(setting("serviceUrl"), window.location);
+
+/**
+ * An endpoint's URL at the Seer the probe settled on (before any probe, at the first candidate), or
+ * null when the Service URL setting names no http(s) service.
+ */
+function endpoint(path, base = seerBase ?? candidates()[0]) {
   return base ? `${base}/${path}` : null;
 }
 
@@ -61,8 +75,8 @@ function headers(json) {
 }
 
 /** One JSON call to the Seer: `{ ok, status, body }`. A network failure, or no URL, is status 0. */
-async function call(path, { method = "GET", body } = {}) {
-  const url = endpoint(path);
+async function call(path, { method = "GET", body, base } = {}) {
+  const url = endpoint(path, base);
   if (!url) return { ok: false, status: 0, body: null };
   try {
     const res = await fetch(url, {
@@ -78,6 +92,25 @@ async function call(path, { method = "GET", body } = {}) {
     log.debug(`the Seer's ${path} did not answer`, err);
     return { ok: false, status: 0, body: null };
   }
+}
+
+/**
+ * Probe each candidate's healthz in order and settle on the first Seer that answers: that call's
+ * `{ ok, status, body }`, or the last failure when none does. A Seer that answers but reports no
+ * link or no world is still the Seer: the ball is dark for its reason, not for one further along.
+ */
+async function findSeer() {
+  let last = { ok: false, status: 0, body: null };
+  for (const base of candidates()) {
+    const health = await call("healthz", { base });
+    if (health.ok) {
+      seerBase = base;
+      return health;
+    }
+    last = health;
+  }
+  seerBase = null;
+  return last;
 }
 
 /**
@@ -159,8 +192,9 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     return app?.rendered ? app.newSitting() : postNewSitting();
   }
 
-  /** The Service URL changed: an open window asks the new Seer. */
+  /** The Service URL changed: the next call looks afresh, and an open window asks the new Seer now. */
   static refresh() {
+    seerBase = null;
     const app = CrystalBallWindow.current;
     if (app?.rendered) void app.reload();
   }
@@ -183,6 +217,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
   #gen = 0;
   /** The open stream's controller. */
   #abort = null;
+  /** The next ask of a dark window. */
+  #retryTimer = null;
   /** The streaming turn and its pending redraw. */
   #streaming = null;
   #paintTimer = null;
@@ -315,6 +351,8 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.#gen++;
     this.#abort?.abort();
     this.#abort = null;
+    clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
     this.#busy = false;
     this.#streaming = null;
     clearTimeout(this.#paintTimer);
@@ -366,7 +404,17 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.#phase = "dark";
     this.#darkLine = line;
     this.#busy = false;
+    this.#armRetry();
     return this.rendered ? this.render() : undefined;
+  }
+
+  /** A dark window asks again after DARK_RETRY_MS, while it is open and still dark. */
+  #armRetry() {
+    clearTimeout(this.#retryTimer);
+    this.#retryTimer = setTimeout(() => {
+      this.#retryTimer = null;
+      if (this.rendered && this.#phase === "dark") void this.reload();
+    }, DARK_RETRY_MS);
   }
 
   /**
@@ -378,7 +426,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const gen = this.#gen;
     this.#phase = "loading";
     if (this.rendered) await this.render();
-    const health = await call("healthz");
+    const health = await findSeer();
     if (gen !== this.#gen) return;
     this.#model = health.ok ? modelLabel(health.body?.model) : null;
     const reason = health.ok ? darkReason(health.body) : "unreachable";

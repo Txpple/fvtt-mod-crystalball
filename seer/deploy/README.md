@@ -141,6 +141,6 @@ journalctl -u crystalball -n 20                     # look for "foundry: connect
 
 Sittings and the usage ledger live in the state directory and survive an update. A Foundry upgrade needs no Seer
 restart: the Seer reconnects by itself when Foundry restarts or the world returns to setup, backing off to one
-attempt a minute, and the window says the ball is dark meanwhile; "foundry: connected" in the journal is the sign
+attempt every fifteen seconds, and the window says the ball is dark meanwhile; "foundry: connected" in the journal is the sign
 it is back. A Foundry build that reshapes `/join` keeps the Seer retrying until a Seer release verified on that
 build (its fixtures under `seer/tests/fixtures/<version>/`) is deployed.

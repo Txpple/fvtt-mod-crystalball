@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPANION_PORT,
   darkReason,
   failureOf,
   MESSAGE_LIMIT,
   modelLabel,
   serviceBase,
+  serviceCandidates,
   sessionIdFrom,
   waitOf
 } from "../scripts/decide/session.js";
@@ -56,6 +58,54 @@ describe("the Seer's base URL", () => {
     expect(serviceBase(undefined, origin)).toBe("https://foundry.example.com/crystalball");
     expect(serviceBase("javascript:alert(1)", origin)).toBeNull();
     expect(serviceBase("/x", "not an origin")).toBeNull();
+  });
+});
+
+describe("where the window looks for the Seer", () => {
+  const at = href => {
+    const u = new URL(href);
+    return { origin: u.origin, protocol: u.protocol, hostname: u.hostname, port: u.port };
+  };
+
+  it("tries prod's same-origin path first, then the companion port of the page's host", () => {
+    expect(serviceCandidates("/crystalball", at("https://foundry.example.com/game"))).toEqual([
+      "https://foundry.example.com/crystalball",
+      `https://foundry.example.com:${COMPANION_PORT}/crystalball`
+    ]);
+    expect(serviceCandidates("", at("http://localhost:30000/game"))).toEqual([
+      "http://localhost:30000/crystalball",
+      "http://localhost:30001/crystalball"
+    ]);
+  });
+
+  it("follows the page's host, so a sandbox reached over the network finds the Seer beside it", () => {
+    expect(serviceCandidates("/crystalball", at("http://192.168.1.20:30000/game"))).toEqual([
+      "http://192.168.1.20:30000/crystalball",
+      "http://192.168.1.20:30001/crystalball"
+    ]);
+    expect(serviceCandidates("/crystalball", at("http://[::1]:30000/game"))).toEqual([
+      "http://[::1]:30000/crystalball",
+      "http://[::1]:30001/crystalball"
+    ]);
+  });
+
+  it("tries a Service URL that names another origin alone", () => {
+    expect(
+      serviceCandidates("http://localhost:30001/crystalball", at("http://localhost:30000/game"))
+    ).toEqual(["http://localhost:30001/crystalball"]);
+    expect(
+      serviceCandidates(
+        "https://seer.example.com/crystalball/",
+        at("https://foundry.example.com/game")
+      )
+    ).toEqual(["https://seer.example.com/crystalball"]);
+  });
+
+  it("adds no companion to a page already on that port, and nothing for a non-http setting", () => {
+    expect(serviceCandidates("/crystalball", at("http://localhost:30001/game"))).toEqual([
+      "http://localhost:30001/crystalball"
+    ]);
+    expect(serviceCandidates("javascript:alert(1)", at("http://localhost:30000/game"))).toEqual([]);
   });
 });
 

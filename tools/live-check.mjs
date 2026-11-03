@@ -2,18 +2,20 @@
 // user) and a temporary player page, every fact read from the world and from the Seer.
 //
 //   FOUNDRY_HOST=local node tools/live-check.mjs                                  # registration, nothing written
-//   FOUNDRY_HOST=local node tools/live-check.mjs --walk [--seer <url>] [--asker Kartor]
+//   FOUNDRY_HOST=local node tools/live-check.mjs --walk [--seer <url>] [--default-url] [--asker Kartor]
 //     [--question "<text>"] [--expect-lookup]
 //
 // Without --walk: the module active, its six world settings registered as the contract names
 // them, the button on the GM page's strip right after Clue Board's (no tab, no action), the
-// window it opens centred, and dark when no Seer answers at the Service URL.
+// window it opens centred, and, with the default Service URL, lit by the Seer on the companion
+// port when one runs there and dark when none does.
 //
 // With --walk: a temporary player (assigned the --asker member's character and Owner on it for
 // the run) opens the window against the Seer at --seer (default http://localhost:30001/crystalball,
-// the Seer's BASE_PATH included; the Service URL setting is pointed there
-// for the run), sends a question with Enter, waits for the ball's answer to finish, checks the
-// stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
+// the Seer's BASE_PATH included; the Service URL setting is pointed there for the run, or left at
+// the contract's default with --default-url, so the window finds the Seer on the companion port
+// as a sandbox's does), sends a question with Enter, waits for the ball's answer to finish, checks
+// the stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
 // sitting empties the transcript. The temp user, its ownership and the setting go in `finally`.
 // --question asks something else; --expect-lookup asserts the window showed the rulebook lookup
 // line under the pending turn (a rules question on a real model).
@@ -46,6 +48,8 @@ const arg = n => {
 };
 const walk = process.argv.includes("--walk");
 const seerUrl = (arg("seer") ?? "http://localhost:30001/crystalball").replace(/\/+$/, "");
+/** The Service URL written for the walk: the Seer's address, or the default the window searches from. */
+const settingUrl = process.argv.includes("--default-url") ? "/crystalball" : seerUrl;
 const askerName = arg("asker") ?? "Kartor";
 
 let fails = 0;
@@ -223,8 +227,13 @@ try {
   assert(A.sidebarStill, "the click left the sidebar's tab and its expansion as they were");
   console.log(`  Service URL: ${A.serviceUrl}; the window: model "${A.state.model}", dark=${A.state.dark}`);
   if (A.serviceUrl === "/crystalball") {
-    // No tunnel on the sandbox: Foundry itself answers /crystalball/healthz with a 404.
-    assert(A.state.dark && A.state.retry && A.state.inputOff, `with no Seer at the default path the ball is dark, the input off, Retry offered ("${A.state.darkLine}")`);
+    // No tunnel on the sandbox: Foundry itself answers /crystalball/healthz with a 404, and the window
+    // then tries the companion port of the page's host (the GM page is on localhost).
+    const companion = await fetch("http://localhost:30001/crystalball/healthz")
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (companion) assert(!A.state.dark && !A.state.inputOff, `with the default Service URL the window found the Seer ${companion.version} on the companion port (model "${A.state.model}")`);
+    else assert(A.state.dark && A.state.retry && A.state.inputOff, `with no Seer at the default path nor on the companion port the ball is dark, the input off, Retry offered ("${A.state.darkLine}")`);
   }
 
   if (walk) {
@@ -238,7 +247,7 @@ try {
     if (health.error) throw new Error(`no Seer at ${seerUrl}`);
 
     temp = await f.evaluate(
-      async ({ id, userName, askerName, seerUrl }) => {
+      async ({ id, userName, askerName, settingUrl }) => {
         const asker = game.actors.find(a => a.type === "character" && a.name.startsWith(askerName));
         if (!asker) return { error: `no character named ${askerName}` };
         const party = game.actors.find(a => a.type === "group" && Array.from(a.system.members ?? []).some(m => m.actor?.id === asker.id));
@@ -249,7 +258,7 @@ try {
         const had = asker.ownership[user.id] ?? null;
         await asker.update({ [`ownership.${user.id}`]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER });
         const priorUrl = game.settings.get(id, "serviceUrl");
-        await game.settings.set(id, "serviceUrl", seerUrl);
+        if (priorUrl !== settingUrl) await game.settings.set(id, "serviceUrl", settingUrl);
         return {
           userId: user.id,
           actorId: asker.id,
@@ -266,14 +275,14 @@ try {
           enabled: game.settings.get(id, "enabled")
         };
       },
-      { id: MODULE_ID, userName: TEMP_USER, askerName, seerUrl }
+      { id: MODULE_ID, userName: TEMP_USER, askerName, settingUrl }
     );
     if (temp.error) throw new Error(temp.error);
     priorUrl = temp.priorUrl;
     console.log(
       `  temp user ${TEMP_USER} (${temp.userId}) asks as ${temp.actorName} (${temp.classLevel}), of "${temp.party}" (${temp.partyMembers} members, ${temp.partyClues} clues on its board)`
     );
-    console.log(`  Who may ask: ${temp.askers}; enabled: ${temp.enabled}; Service URL ${temp.priorUrl} → ${seerUrl} for the run`);
+    console.log(`  Who may ask: ${temp.askers}; enabled: ${temp.enabled}; Service URL ${temp.priorUrl} → ${settingUrl} for the run${settingUrl === "/crystalball" ? " (the default: the window searches the companion port)" : ""}`);
 
     fp = new Foundry({ ...foundryConfig(env), user: TEMP_USER, password: "" });
     console.log("[crystalball] connecting as the player…");
@@ -292,7 +301,10 @@ try {
           }
           return null;
         };
-        const base = game.settings.get(id, "serviceUrl").replace(/\/+$/, "");
+        const setting = game.settings.get(id, "serviceUrl").replace(/\/+$/, "");
+        // As the window resolves it: the default names Foundry's own origin, which serves nothing here,
+        // so the Seer is on the companion port of the page's host.
+        const base = setting.startsWith("/") ? `${location.protocol}//${location.hostname}:30001${setting}` : setting;
         const cookieSession = document.cookie.split("; ").some(c => c.startsWith("session="));
         // As the window takes it: the socket's id first, the cookie only on an older build.
         const session =

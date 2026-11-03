@@ -237,7 +237,7 @@ export function createLink({
   worldTtlMs = 60000,
   negativeTtlMs = 30000,
   minBackoffMs = 1000,
-  maxBackoffMs = 60000
+  maxBackoffMs = 15000
 }) {
   const where = foundryAddress(url);
   const state = { connected: false, worldOpen: false, world: null, ballUser: null };
