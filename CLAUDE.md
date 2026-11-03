@@ -161,7 +161,14 @@ that hop its lookups are spent and asks once more when a turn writes no words. 2
 answer-only hop writing all 5 times. The sandbox's Seer runs it; the walk GREEN on the subclass question. **1.0.9
 released and on prod** ("Release 1.0.9", "and put on prod"): both, through the reusable workflow; the installer PASS
 on prod, 19/19 served files byte-identical; the box's Seer at `v1.0.9` once the user passed Tailscale SSH's browser
-check, `healthz` 1.0.9 on Haiku and a forged id 401 through the public hostname.
+check, `healthz` 1.0.9 on Haiku and a forged id 401 through the public hostname. **1.0.10 released and on
+prod: the bar says how the ball is, never the model** (the user: "can we change this to not say haiku? it will
+confuse players", then "Release and prod"): *Crystal Ball – Clear and Ready*, *Crystal Ball – Gazing…*, *Crystal
+Ball – Dark*; a GM's tooltip on it names the model. `verify` green (404 tests); deployed `--local`, the walk GREEN,
+its bar checks the word on both pages and the tooltip on the GM's alone; the words fit the default window on one
+line. The installer PASS on prod (the DM's own tab the one browser bounced), 19/19 served files byte-identical with
+the zip. The box's Seer stays at `v1.0.9`: nothing under `seer/` changed, so its `healthz` reads 1.0.9 (the version
+is its clone's `module.json`), connected to the relaunched world.
 
 ## The rules this module keeps
 
