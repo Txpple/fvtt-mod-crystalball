@@ -158,7 +158,10 @@ cents and 12 s a check; a narrow checker fires on 3 of 11 fresh answers; 2 of 22
 lookups. **Then the empty answers fixed, on `main`** (the user: "we can't have empty answeres"): Haiku ended the
 answer-only hop after a fourth round of lookups with no content at all (2 of 15 rules questions); the Seer now tells
 that hop its lookups are spent and asks once more when a turn writes no words. 24 asks after: none empty, the
-answer-only hop writing all 5 times. The sandbox's Seer runs it; the walk GREEN on the subclass question.
+answer-only hop writing all 5 times. The sandbox's Seer runs it; the walk GREEN on the subclass question. **1.0.9
+released and on prod** ("Release 1.0.9", "and put on prod"): both, through the reusable workflow; the installer PASS
+on prod, 19/19 served files byte-identical; the box's Seer at `v1.0.9` once the user passed Tailscale SSH's browser
+check, `healthz` 1.0.9 on Haiku and a forged id 401 through the public hostname.
 
 ## The rules this module keeps
 
