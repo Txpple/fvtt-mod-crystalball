@@ -2,7 +2,7 @@
   "name": "fvtt-mod-crystalball",
   "private": true,
   "type": "module",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Crystal Ball: the module is plain ES modules loaded straight from scripts/, with no build step and nothing from here shipping in it. The Seer (seer/) is a Node service run from this package: `npm ci --omit=dev` on the box installs its runtime dependencies alone. This file declares both and the gate (Biome and the unit tests).",
   "scripts": {
     "verify": "npm run check && npm run test",
