@@ -80,8 +80,8 @@ Seer at `v1.0.4` by the guide's Updating over SSH, "foundry: connected" at once,
 401 through the public hostname. Known: the
 MCP's restart and mirror guards count the ball's user among connected users (prod's `/api/status` reads 1 with the
 box's Seer up), so the local restart needed `--force`; the MCP's guards discount it since the same evening (its
-`scripts/lib/seer.mjs`, unreleased on its `main`). **1.0.5 on `main`, unreleased: the review's corrections** (an adversarial review of 1.0.3 to 1.0.4 at the
-user's request; the user: "yes lets go"). The scheduled task had died with STATUS_CONTROL_C_EXIT, a console event
+`scripts/lib/seer.mjs`, unreleased on its `main`). **1.0.5 released and on prod the same night: the review's corrections** (an adversarial review of 1.0.3 to 1.0.4 at the
+user's request; the user: "yes lets go", then "Yes, release"). The scheduled task had died with STATUS_CONTROL_C_EXIT, a console event
 reaching the hidden PowerShell's console, and its detached-launch repair registered a command with no path
 separator; the tool is deleted and the task removed. The sandbox's Seer is now started beside Foundry by the MCP's
 `local-foundry.mjs start` (a detached, windowless process, its lines in `seer/data/seer.log`, its pid beside
@@ -93,8 +93,11 @@ Seer or the route down); a 3-second healthz probe with no session header, a simp
 found base kept only by the search still current; a dark window re-asks only for reasons that can heal (never
 after a 401 or 403, where 1.0.4 asked every ten seconds for ever) and stays dark on screen while it asks. `verify`
 green (378 tests); 1.0.5 deployed `--local`; `tools/live-check.mjs --walk --default-url` GREEN against the
-launcher's Seer on the real model, the GM page's window lit by the companion port, Kartor's answer in 4.5 s. Not
-released, not pushed; prod on 1.0.4; the box's Seer to `v1.0.5` with the release.
+launcher's Seer on the real model, the GM page's window lit by the companion port, Kartor's answer in 4.5 s. Released
+through the reusable workflow (the annotated `v1.0.5`, `latest` serving it), installed on prod through the installer with no
+player connected (PASS, 18/18 served files byte-identical with the zip), the box's Seer at `v1.0.5` by the guide's Updating
+over Tailscale SSH (its browser check passed by the user), "foundry: connected" at once, `healthz` 1.0.5 and a forged id 401
+through the public hostname; the sandbox runs the same 1.0.5 files, deployed `--local` before the walk.
 
 ## The rules this module keeps
 

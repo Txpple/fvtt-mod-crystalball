@@ -29,8 +29,8 @@ sudo npm ci --omit=dev            # the three runtime dependencies, nothing else
 ```
 
 The admin runs `npm ci`: a `--system` user has no writable npm cache, and a service that can rewrite its own code is
-a service an attacker can rewrite. `healthz` reports the version from `module.json`; the window warns when it
-differs from the module's.
+a service an attacker can rewrite. `healthz` reports the version from `module.json`, so a Seer left on an older tag
+shows it there (the window does not warn); the Updating steps below keep the two in step.
 
 ## 2. The ball's user
 
