@@ -17,10 +17,12 @@ const URL_ = "http://foundry.test:30000";
 const COOKIE = "unjoinedSess0000000000001";
 const ADA_SESSION = "adaSession00000000000001";
 const PASSWORD = "not-a-real-password";
+const BALL = "ballUser00000001";
 
 /**
  * Foundry 14.369 as the fixtures describe it, with switches a test can throw: the cookie GET
- * /join hands out, the sessions a restart forgot, the world closed, the join's reply.
+ * /join hands out, the sessions a restart forgot, the world closed, the join's reply, and whether
+ * the world counts the ball present (as Foundry does, from a joined socket's connect on).
  */
 function fakeFoundry() {
   const f = {
@@ -28,6 +30,7 @@ function fakeFoundry() {
     forgotten: new Set(),
     joined: new Set(),
     worldOpen: true,
+    counted: false,
     joinReply: fixture("join-reply"),
     posts: [],
     gets: 0,
@@ -59,10 +62,13 @@ function fakeFoundry() {
       const unjoined = { ...fixture("session-unjoined"), sessionId: cookie };
       if (!f.worldOpen) return { session: unjoined, joinData: {} };
       if (!f.joined.has(cookie)) return { session: unjoined, joinData: fixture("join-data") };
+      f.counted = true;
       return {
         session: { ...fixture("session-joined"), sessionId: cookie },
         world: () => f.worldPayload,
-        modifyDocument: request => f.packReply(request)
+        modifyDocument: request => f.packReply(request),
+        worldStatus: true,
+        present: () => (f.counted ? [BALL] : [])
       };
     }
     if (cookie === ADA_SESSION)
@@ -193,16 +199,25 @@ describe("the link", () => {
     expect(link.state()).toEqual({
       connected: false,
       worldOpen: false,
+      counted: false,
       world: null,
       ballUser: null
     });
     link.start();
-    await until(() => link.state().connected);
+    await until(() => link.state().counted === true);
     expect(link.state()).toEqual({
       connected: true,
       worldOpen: true,
+      counted: true,
       world: "test-world",
       ballUser: "Crystal Ball"
+    });
+    const ask = f.io.sockets.at(-1).requests.map(r => r.event);
+    expect(ask.indexOf("getUserActivity")).toBeLessThan(ask.indexOf("getWorldStatus"));
+    expect(log.lines.find(l => l.message === "foundry: connected").fields).toEqual({
+      world: "test-world",
+      ballUser: "Crystal Ball",
+      counted: true
     });
     expect(f.posts).toHaveLength(1);
     expect(f.posts[0].body).toEqual(joinBody("ballUser00000001", PASSWORD));
@@ -333,6 +348,50 @@ describe("the link", () => {
     expect(
       log.lines.some(l => l.message === "foundry: the world shut down; the ball leaves with it")
     ).toBe(true);
+  });
+
+  it("names the world in its connected line after a rejoin on the cookie", async () => {
+    const f = fakeFoundry();
+    const { link, log } = linkFor(f);
+    link.start();
+    await until(() => link.state().counted === true);
+    f.worldOpen = false;
+    f.io.sockets.at(-1).fire("shutdown", fixture("shutdown"));
+    await until(() => log.lines.some(l => /world-closed/.test(l.fields?.error ?? "")));
+    f.worldOpen = true;
+    await until(() => link.state().counted === true);
+    const lines = log.lines.filter(l => l.message === "foundry: connected");
+    expect(lines).toHaveLength(2);
+    expect(lines[1].fields).toEqual({
+      world: "test-world",
+      ballUser: "Crystal Ball",
+      counted: true
+    });
+  });
+
+  it("rejoins on a new socket when Foundry no longer counts the ball", async () => {
+    const f = fakeFoundry();
+    const { link, log } = linkFor(f, { presenceMs: 20 });
+    link.start();
+    await until(() => link.state().counted === true);
+    const ball = f.io.sockets.at(-1);
+    f.counted = false;
+    await until(() => f.io.sockets.at(-1) !== ball && link.state().counted === true);
+    expect(ball.disconnected).toBe(true);
+    expect(f.io.sockets.at(-1).cookie).toBe(COOKIE);
+    expect(f.posts).toHaveLength(1);
+    expect(log.lines.some(l => /does not count the ball/.test(l.message))).toBe(true);
+  });
+
+  it("asks again every interval and keeps a counted ball's socket", async () => {
+    const f = fakeFoundry();
+    const { link } = linkFor(f, { presenceMs: 20 });
+    link.start();
+    await until(() => link.state().counted === true);
+    const ball = f.io.sockets.at(-1);
+    await until(() => ball.emitted.filter(e => e === "getUserActivity").length >= 3);
+    expect(f.io.sockets.at(-1)).toBe(ball);
+    expect(link.state()).toMatchObject({ connected: true, counted: true });
   });
 
   it("fails a world fetch at once when the world shuts down under it", async () => {

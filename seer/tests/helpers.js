@@ -1,8 +1,8 @@
 /**
  * What the Seer's tests share: the fixtures of the Foundry build the Seer is verified on, a
  * silent logger that keeps what it was told, and a fake socket.io that answers as Foundry 14.369
- * does (the `session` event on connect, acknowledgements for `getJoinData`, `world` and a
- * pack's `modifyDocument` get).
+ * does (the `session` event on connect, acknowledgements for `getJoinData`, `world`,
+ * `getWorldStatus` and a pack's `modifyDocument` get, and `getUserActivity`'s events).
  */
 
 import fs from "node:fs";
@@ -32,8 +32,9 @@ export const tempDir = prefix => fs.mkdtempSync(path.join(os.tmpdir(), `crystalb
 
 /**
  * A fake socket.io client. `behave(sessionId)` decides what Foundry says to a socket opened on a
- * cookie: `{ session, joinData, world }` (each a value, or a function of nothing), a
- * `modifyDocument` function of the request, or `{ connectError }`.
+ * cookie: `{ session, joinData, world, worldStatus, present }` (each a value, or a function of
+ * nothing; `present` the user ids `getUserActivity` names), a `modifyDocument` function of the
+ * request, or `{ connectError }`.
  */
 export function fakeIo(behave) {
   const sockets = [];
@@ -70,8 +71,17 @@ export function fakeIo(behave) {
         for (const h of list) h.fn(...args);
       },
       emit(event, ...args) {
-        const ack = args.pop();
         socket.emitted.push(event);
+        // Answered on this socket alone, with no acknowledgement: a `userActivity` per user present.
+        if (event === "getUserActivity") {
+          socket.requests.push({ event, args });
+          const present =
+            typeof plan.present === "function" ? plan.present() : (plan.present ?? []);
+          for (const id of present)
+            setImmediate(() => socket.fire("userActivity", id, { active: true }));
+          return;
+        }
+        const ack = args.pop();
         socket.requests.push({ event, args });
         const answer =
           event === "getJoinData"
@@ -80,7 +90,9 @@ export function fakeIo(behave) {
               ? plan.world
               : event === "modifyDocument"
                 ? () => plan.modifyDocument?.(...args)
-                : undefined;
+                : event === "getWorldStatus"
+                  ? plan.worldStatus
+                  : undefined;
         // An answer that is (or whose function returns) undefined is never sent: a Foundry that
         // has stopped answering.
         const value = typeof answer === "function" ? answer() : answer;

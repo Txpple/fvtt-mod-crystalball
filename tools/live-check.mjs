@@ -260,6 +260,16 @@ try {
     console.log(`  healthz: ${JSON.stringify(health)}`);
     assert(!health.error && health.foundry?.connected && health.foundry?.worldOpen, "the Seer answers healthz, linked to an open world");
     if (health.error) throw new Error(`no Seer at ${seerUrl}`);
+    if (health.foundry?.ballUser) {
+      const active = await f.evaluate(
+        name => game.users.find(u => u.name === name)?.active ?? null,
+        health.foundry.ballUser
+      );
+      assert(
+        health.foundry.counted === true && active === true,
+        `Foundry counts the ball's user present, as healthz says (counted ${health.foundry.counted}, active ${active})`
+      );
+    }
 
     temp = await f.evaluate(
       async ({ id, userName, askerName, settingUrl }) => {

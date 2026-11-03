@@ -201,14 +201,17 @@ installer's `shutdown`, retried through the setup screen and rejoined 10 s after
 - **The ball's user is a Player, never a GM.** Foundry sends every document to every connected user whatever its
   role, so the role buys no reading; a GM-level socket that runs no modules would be elected the table's active GM
   while the DM is away and By the Books' consequences would land on it and die. The Seer writes nothing to
-  Foundry: its socket emits `world` and, for the rulebooks, a pack's `modifyDocument` get, nothing else.
+  Foundry: its socket emits `world`, for the rulebooks a pack's `modifyDocument` get, and for its presence
+  `getUserActivity` and `getWorldStatus` (each answered on that socket alone), nothing else.
 - **The join, as 14.369 has it** (read from the build): the ball's user id comes from `getJoinData` on a socket
   holding the fresh cookie a plain GET of `/join` hands out (the page lists no users; a GET of `/join` with a
   session cookie logs that session out, so the Seer never sends one); `POST /join` names Foundry's own `Origin`
   (and `Sec-Fetch-Site: same-origin`) or Foundry answers 400; sessions last 24 hours, the Seer resumes on its
   cookie after a drop and rejoins when Foundry has forgotten it. A world closed (the setup screen, an installer's
   relaunch) emits `shutdown` to every socket and closes none; a socket that outlives the close is answered but never
-  counted present again, so the Seer leaves on `shutdown` and rejoins. A build that reshapes any of this fails the
+  counted present again, so the Seer leaves on `shutdown` and rejoins. Whether Foundry counts the ball is asked of
+  Foundry at each join and every minute (the contract's *Presence*), reported as `healthz`'s `counted` (what the
+  MCP's guards discount on), and a ball not counted rejoins. A build that reshapes any of this fails the
   fixtures under `seer/tests/fixtures/<version>/` before a live socket hangs.
 - **What the lore holds is the DM's ownership, nothing else.** A journal entry or page at `default ≥ 2` is every
   player's lore (on this world the Bestiary and the four backstories are, as measured); a secret block shows in the

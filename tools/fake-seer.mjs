@@ -42,7 +42,7 @@ http
     console.log(`${req.method} ${path}${req.headers["x-foundry-session"] ? " (session)" : ""}`);
     if (path === "/healthz") {
       const up = Math.round((Date.now() - started) / 1000);
-      return json(res, 200, { version: "0.1.0", foundry: { connected: true, worldOpen: true, world: null, ballUser: null }, model: "stub", uptimeSeconds: up });
+      return json(res, 200, { version: "0.1.0", foundry: { connected: true, worldOpen: true, counted: true, world: null, ballUser: null }, model: "stub", uptimeSeconds: up });
     }
     if (!req.headers["x-foundry-session"]) return json(res, 401, { error: "unknown-session" });
     if (req.method === "GET" && path === "/sittings/current") return json(res, 200, sitting);

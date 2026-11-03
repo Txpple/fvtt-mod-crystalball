@@ -57,8 +57,11 @@ All responses are JSON (`application/json`) except `POST chat`, which is `text/e
 ### `GET healthz`
 
 `{ "version": "<the Seer's version, = module.json's>", "foundry": { "connected": bool, "worldOpen": bool,
-"world": "<id or null>", "ballUser": "<name or null>" }, "model": "<model id or 'stub'>", "uptimeSeconds": n,
-"timeZone": "<the zone the limits' calendar follows>" }`. Always 200. No secrets, no paths.
+"counted": bool | null, "world": "<id or null>", "ballUser": "<name or null>" }, "model": "<model id or 'stub'>",
+"uptimeSeconds": n, "timeZone": "<the zone the limits' calendar follows>" }`. Always 200. No secrets, no paths.
+`counted` is Foundry's own last word on whether it counts the ball's user present in the world (what `user.active`,
+the Players list and `/api/status` read; see *Presence*): null until first asked after a join, false while the
+link is down. A tool that discounts the ball from Foundry's count of users discounts it only while this is true.
 
 ### `GET sittings/current`
 
@@ -272,6 +275,10 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
   session), but it is never counted present there (a user joins a world's activity only when a socket connects):
   `user.active`, the Players list and `/api/status` leave the ball out while `healthz` says connected. So the Seer
   disconnects the ball's socket on `shutdown` and, once the world is back, rejoins on a new socket on its cookie.
+- **Presence**: `socket.emit("getUserActivity")` answers on the asking socket alone with a `userActivity` event
+  (`id, { active, … }`) for each user Foundry counts present; `socket.emit("getWorldStatus", callback)`, asked after
+  it, is acknowledged after them all (one connection keeps its order). The Seer asks at each join and every minute
+  (`healthz`'s `counted`); a ball Foundry does not count leaves and rejoins on a new socket, which Foundry counts.
 - **World**: `socket.emit("world", callback)` → the payload with `users`, `actors`, `items`, `journal`, `folders`,
   `settings`, `messages`, … (every document, unfiltered) plus `userId`.
 - **A pack's documents**: `socket.emit("modifyDocument", { type: "<JournalEntry | Item>", action: "get", operation:
