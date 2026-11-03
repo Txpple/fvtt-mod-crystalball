@@ -168,15 +168,18 @@ Ball – Dark*; a GM's tooltip on it names the model. `verify` green (404 tests)
 its bar checks the word on both pages and the tooltip on the GM's alone; the words fit the default window on one
 line. The installer PASS on prod (the DM's own tab the one browser bounced), 19/19 served files byte-identical with
 the zip. The box's Seer stays at `v1.0.9`: nothing under `seer/` changed, so its `healthz` reads 1.0.9 (the version
-is its clone's `module.json`). Its socket stayed open across that relaunch, and Foundry has left the ball out of
-its users since (offline in `list-users`, not in `/api/status`) while `healthz` says connected: Foundry closes a
+is its clone's `module.json`). Its socket stayed open across that relaunch, and Foundry left the ball out of its
+users after it (offline in `list-users`, not in `/api/status`) while `healthz` said connected: Foundry closes a
 world without closing its sockets, and counts a socket present only when it connects. Every earlier install had
-restarted the box's Seer after it. **On `main`, unreleased: the ball leaves with a closed world** (the user: "Yes,
-build the fix"): on Foundry's `shutdown` the Seer disconnects, then rejoins on a new socket once the world is back;
-the contract first. `verify` green (407 tests). On the sandbox, a world relaunch left the old Seer uncounted (0
-users, `healthz` connected); the new one left on `shutdown`, rejoined in 3 s and was counted; the walk GREEN after,
-Kartor's answer in 11 s. Prod's Seer stays uncounted until it is restarted or takes the release, and meanwhile the
-MCP's guards subtract it anyway, so one real user reads as none.
+restarted the box's Seer after it. **1.0.11 released and on prod: the ball leaves with a closed world** (the user:
+"Yes, build the fix", then "Release and prod"): on Foundry's `shutdown` the Seer disconnects, then rejoins on a new
+socket once the world is back; the contract first. `verify` green (407 tests). On the sandbox, a world relaunch left
+the old Seer uncounted (0 users, `healthz` connected); the new one left on `shutdown`, rejoined in 3 s and was
+counted; the walk GREEN after, Kartor's answer in 11 s; 1.0.11 deployed `--local`, byte-identical. The annotated
+`v1.0.11` through the reusable workflow, `latest` serving it. The box's Seer moved to `v1.0.11` first (a fresh join,
+counted), then the installer PASS on prod with only the bridge and the ball connected: the Seer left on the
+installer's `shutdown`, retried through the setup screen and rejoined 10 s after the world was back, counted;
+19/19 served files byte-identical with the zip; `healthz` 1.0.11 and a forged id 401 through the public hostname.
 
 ## The rules this module keeps
 
