@@ -180,6 +180,15 @@ counted; the walk GREEN after, Kartor's answer in 11 s; 1.0.11 deployed `--local
 counted), then the installer PASS on prod with only the bridge and the ball connected: the Seer left on the
 installer's `shutdown`, retried through the setup screen and rejoined 10 s after the world was back, counted;
 19/19 served files byte-identical with the zip; `healthz` 1.0.11 and a forged id 401 through the public hostname.
+**1.0.12 released and on prod: presence asked of Foundry** (the user: "fix these tasks autonomously and close this
+out"): at each join and every minute the Seer asks whether Foundry counts the ball present, `healthz` reports it as
+`foundry.counted`, and a ball not counted rejoins; the MCP's guards discount only a counted ball; the connected line
+comes after the first world fetch, so a rejoin names the world. The contract first; `verify` green (410 tests); on
+the sandbox counted after a join and a relaunch, the walk GREEN with its new presence check (`counted` against the
+GM page's `user.active`); 1.0.12 deployed `--local`. The box's Seer at `v1.0.12` first, then the installer PASS on
+prod (a parallel Card Catalogue install interleaved with it; the Seer left and rejoined across both relaunches,
+counted); 19/19 served files byte-identical with the zip; `healthz` 1.0.12 and a forged id 401 through the public
+hostname.
 
 ## The rules this module keeps
 
