@@ -14,6 +14,10 @@
  *   `{ sessionId, userId }` (userId null when the session has not joined the running world, the
  *   whole thing null when the cookie is unknown). `world` answers the full payload, unfiltered.
  * - **The probe**: the same handshake with a player's session id, read `session`, disconnect.
+ * - **A world closed** (the setup screen, an installer's relaunch): Foundry emits `shutdown` to
+ *   every socket and closes none, and its sessions outlive the close. A socket still open when the
+ *   world is back is answered as before but never counted present (a user joins a world's activity
+ *   only when a socket connects), so the ball leaves on `shutdown` and rejoins on a new socket.
  *
  * - **A pack's documents**: `modifyDocument` with `{ type, action: "get", operation: { pack,
  *   query: {} } }`, as the client's own `getDocuments` asks; the acknowledgement's `result` holds
@@ -354,6 +358,18 @@ export function createLink({
       log.warn("foundry: the ball's socket dropped", { reason: String(reason) });
       teardown();
       schedule(`disconnected: ${reason}`);
+    });
+    s.on("shutdown", () => {
+      if (socket !== s) return;
+      log.warn("foundry: the world shut down; the ball leaves with it");
+      state.worldOpen = false;
+      // The socket's own disconnect fails an ask waiting on it at once and runs the drop's handler
+      // above; the teardown is for a socket that fires no event when it is disconnected.
+      s.disconnect();
+      if (socket === s) {
+        teardown();
+        schedule("world shutdown");
+      }
     });
     log.info("foundry: connected", { world: state.world, ballUser: state.ballUser });
     await fetchWorld().catch(err =>

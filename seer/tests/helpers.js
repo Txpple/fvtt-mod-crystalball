@@ -87,10 +87,13 @@ export function fakeIo(behave) {
         if (value === undefined) return;
         setImmediate(() => ack(value));
       },
+      // As socket.io-client 4 does: a connected socket's own disconnect fires `disconnect` at once.
       disconnect() {
         if (socket.disconnected) return;
+        const was = socket.connected;
         socket.disconnected = true;
         socket.connected = false;
+        if (was) socket.fire("disconnect", "io client disconnect");
       }
     };
     sockets.push(socket);

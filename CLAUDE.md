@@ -168,7 +168,15 @@ Ball – Dark*; a GM's tooltip on it names the model. `verify` green (404 tests)
 its bar checks the word on both pages and the tooltip on the GM's alone; the words fit the default window on one
 line. The installer PASS on prod (the DM's own tab the one browser bounced), 19/19 served files byte-identical with
 the zip. The box's Seer stays at `v1.0.9`: nothing under `seer/` changed, so its `healthz` reads 1.0.9 (the version
-is its clone's `module.json`), connected to the relaunched world.
+is its clone's `module.json`). Its socket stayed open across that relaunch, and Foundry has left the ball out of
+its users since (offline in `list-users`, not in `/api/status`) while `healthz` says connected: Foundry closes a
+world without closing its sockets, and counts a socket present only when it connects. Every earlier install had
+restarted the box's Seer after it. **On `main`, unreleased: the ball leaves with a closed world** (the user: "Yes,
+build the fix"): on Foundry's `shutdown` the Seer disconnects, then rejoins on a new socket once the world is back;
+the contract first. `verify` green (407 tests). On the sandbox, a world relaunch left the old Seer uncounted (0
+users, `healthz` connected); the new one left on `shutdown`, rejoined in 3 s and was counted; the walk GREEN after,
+Kartor's answer in 11 s. Prod's Seer stays uncounted until it is restarted or takes the release, and meanwhile the
+MCP's guards subtract it anyway, so one real user reads as none.
 
 ## The rules this module keeps
 
@@ -195,7 +203,9 @@ is its clone's `module.json`), connected to the relaunched world.
   holding the fresh cookie a plain GET of `/join` hands out (the page lists no users; a GET of `/join` with a
   session cookie logs that session out, so the Seer never sends one); `POST /join` names Foundry's own `Origin`
   (and `Sec-Fetch-Site: same-origin`) or Foundry answers 400; sessions last 24 hours, the Seer resumes on its
-  cookie after a drop and rejoins when Foundry has forgotten it. A build that reshapes any of this fails the
+  cookie after a drop and rejoins when Foundry has forgotten it. A world closed (the setup screen, an installer's
+  relaunch) emits `shutdown` to every socket and closes none; a socket that outlives the close is answered but never
+  counted present again, so the Seer leaves on `shutdown` and rejoins. A build that reshapes any of this fails the
   fixtures under `seer/tests/fixtures/<version>/` before a live socket hangs.
 - **What the lore holds is the DM's ownership, nothing else.** A journal entry or page at `default ≥ 2` is every
   player's lore (on this world the Bestiary and the four backstories are, as measured); a secret block shows in the

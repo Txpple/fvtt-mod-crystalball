@@ -147,6 +147,10 @@ describe(`the ${FOUNDRY_BUILD} fixtures`, () => {
     expect(fixture("session-unknown")).toBeNull();
     expect(fixture("world").userId).toBe("ballUser00000001");
   });
+
+  it("hold the shutdown event's shape", () => {
+    expect(fixture("shutdown")).toEqual({ world: "test-world", userId: null });
+  });
 });
 
 describe("the address and the socket", () => {
@@ -306,6 +310,40 @@ describe("the link", () => {
     expect(delays.slice(0, 5)).toEqual([5, 10, 20, 40, 40]);
     f.worldOpen = true;
     await until(() => link.state().connected, 3000);
+  });
+
+  it("leaves with the world when Foundry shuts it down and rejoins on a new socket", async () => {
+    const f = fakeFoundry();
+    const { link, log } = linkFor(f);
+    link.start();
+    await until(() => link.state().connected);
+    const ball = f.io.sockets.at(-1);
+    f.worldOpen = false;
+    ball.fire("shutdown", fixture("shutdown"));
+    expect(ball.disconnected).toBe(true);
+    expect(link.state()).toMatchObject({ connected: false, worldOpen: false });
+    await until(() => log.lines.some(l => /world-closed/.test(l.fields?.error ?? "")));
+    expect(link.state().connected).toBe(false);
+    f.worldOpen = true;
+    await until(() => link.state().connected);
+    const back = f.io.sockets.at(-1);
+    expect(back).not.toBe(ball);
+    expect(back.cookie).toBe(COOKIE);
+    expect(f.posts).toHaveLength(1);
+    expect(
+      log.lines.some(l => l.message === "foundry: the world shut down; the ball leaves with it")
+    ).toBe(true);
+  });
+
+  it("fails a world fetch at once when the world shuts down under it", async () => {
+    const f = fakeFoundry();
+    const { link } = linkFor(f);
+    link.start();
+    await until(() => link.state().connected);
+    f.worldPayload = undefined;
+    const pending = link.world({ fresh: true });
+    f.io.sockets.at(-1).fire("shutdown", fixture("shutdown"));
+    await expect(pending).rejects.toThrow(/dropped/);
   });
 
   it("goes dark when the world payload comes back empty", async () => {

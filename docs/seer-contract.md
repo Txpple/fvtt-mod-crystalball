@@ -267,6 +267,11 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
 - **Socket**: socket.io 4.x client to `{FOUNDRY_URL}` with `path: "/socket.io"`, `transports: ["websocket"]` and
   the header `Cookie: session=<id>`. The server emits `session` with `{ sessionId, userId }` (userId null when the
   session has not joined the running world; the whole thing null when unknown).
+- **A world closed**: Foundry emits `shutdown` (`{ world, userId }`) to every socket and closes none, and its
+  sessions outlive the close. A socket still open when the world is back is answered as before (`world` reads its
+  session), but it is never counted present there (a user joins a world's activity only when a socket connects):
+  `user.active`, the Players list and `/api/status` leave the ball out while `healthz` says connected. So the Seer
+  disconnects the ball's socket on `shutdown` and, once the world is back, rejoins on a new socket on its cookie.
 - **World**: `socket.emit("world", callback)` → the payload with `users`, `actors`, `items`, `journal`, `folders`,
   `settings`, `messages`, … (every document, unfiltered) plus `userId`.
 - **A pack's documents**: `socket.emit("modifyDocument", { type: "<JournalEntry | Item>", action: "get", operation:
@@ -277,4 +282,4 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
   for a connected player (a user is deactivated only when their last socket drops).
 
 A fixture per Foundry build (`seer/tests/fixtures/<version>/`) holds a trimmed `session` event, a trimmed `world`
-payload (synthetic, never the real world) and the join reply, so `npm test` fails before a live bridge hangs.
+payload (synthetic, never the real world), the `shutdown` event and the join reply, so `npm test` fails before a live bridge hangs.
