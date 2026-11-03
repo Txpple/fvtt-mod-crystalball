@@ -55,7 +55,7 @@ Worlds too"), each by a line scoped to that book (`dnd-arcana-unleashed: Chapter
 a Chapter 3, 5 and 6 of its own; its bestiary was never read (actor packs are refused).
 Checked against the copied packs; released ("you can then release and put on prod"), installed on prod through the
 installer (18/18 served files byte-identical), the box's Seer at `v1.0.3`, `healthz` 1.0.3 and a forged id 401
-through the public hostname; prod's world has no saved rulebook settings, so a GM page reads the new defaults. **1.0.4 on `main`, unreleased: the sandbox's ball made reliable** (the user: "crystal ball is not
+through the public hostname; prod's world has no saved rulebook settings, so a GM page reads the new defaults. **1.0.4 released and on prod: the sandbox's ball made reliable** (the user: "crystal ball is not
 working on sandbox again", then "just fix this shit so we dont have issues like this all the time on sandbox. no
 terminal dependencies on this?", "do a long diag and figure out a long term solution why this fails on the windows
 sandbox"). The ball had gone dark there five ways in one day: the Seer died with the session's terminal that ran it;
@@ -76,7 +76,11 @@ Checked: `healthz` on 127.0.0.1, ::1, the Wi-Fi and the Tailscale address; a pre
 `*`; no window among the task's three processes; `stop` and `start` through the task; the Seer rejoining after
 `local-foundry.mjs restart --force`; `verify` green (377 tests); 1.0.4 deployed `--local`, byte-identical, the
 manifest 1.0.4 after that restart; `tools/live-check.mjs --walk --default-url` GREEN on the real model, the GM page's
-window lit by the companion port and Kartor's answer in 5 s. Release and prod wait for the user's word. Known: the
+window lit by the companion port and Kartor's answer in 5 s. Released on the user's word ("Release and
+prod"): the annotated `v1.0.4` through the reusable workflow, `latest` serving it; prod with only the bridge and
+the ball's user connected, the installer PASS, 18/18 served files byte-identical with the release zip; the box's
+Seer at `v1.0.4` by the guide's Updating over SSH, "foundry: connected" at once, `healthz` 1.0.4 and a forged id
+401 through the public hostname. Known: the
 MCP's restart and mirror guards count the ball's user among connected users (prod's `/api/status` reads 1 with the
 box's Seer up), so the local restart needed `--force`; the MCP's guards discount it since the same evening (its
 `scripts/lib/seer.mjs`, unreleased on its `main`).
