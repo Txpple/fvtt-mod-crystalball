@@ -24,7 +24,7 @@ describe("the harness a model reads", () => {
   });
 
   it("carries its own version", () => {
-    expect(versionOf(HAIKU)).toBe("haiku-5");
+    expect(versionOf(HAIKU)).toBe("haiku-6");
     expect(versionOf(GENERAL)).toBe("general-4");
     expect(HARNESSES.map(h => h.name)).toEqual(["haiku", "general"]);
   });
@@ -32,7 +32,7 @@ describe("the harness a model reads", () => {
   it("names the gaze's version in its meta", () => {
     const w = world();
     const gaze = model => buildGaze(w, ADA, moduleSettings(w), { model });
-    expect(gaze("claude-haiku-5-5").meta.instructionsVersion).toBe("haiku-5");
+    expect(gaze("claude-haiku-5-5").meta.instructionsVersion).toBe("haiku-6");
     expect(gaze("claude-sonnet-5-5").meta.instructionsVersion).toBe("general-4");
     expect(gaze("claude-haiku-5-5").layers[0].text.startsWith(HAIKU.standing)).toBe(true);
     expect(gaze(undefined).layers[0].text.startsWith(GENERAL.standing)).toBe(true);
@@ -103,5 +103,14 @@ describe("the instructions layer", () => {
       "Name a session only when you can see the fact under that session's heading"
     );
     expect(HAIKU.standing).toContain('otherwise say "the session diary"');
+    // Quotes and speakers, the record's numbers, links, the mark in a list, what a feature grants.
+    for (const line of [
+      "name a speaker only when the record names one",
+      "Give the record's own numbers",
+      "Connect two people, creatures, places or events as fact only when the record connects them",
+      "Mark it every time you use one, in a list as well as in a sentence.",
+      '"Always prepared" is not "free to cast"'
+    ])
+      expect(HAIKU.standing).toContain(line);
   });
 });

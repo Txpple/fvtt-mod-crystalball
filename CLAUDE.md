@@ -148,8 +148,12 @@ world's saved row ignored. `verify` green (401 tests), the walk GREEN on the san
 connected there); the installer PASS on prod, 19/19 served files byte-identical; the box's Seer at `v1.0.8`. **On
 `main`, unreleased: Haiku's harness `haiku-5`** (the user: "do the citation fix"): a source by the record's own label,
 a session only under its heading, quotes only from the place named; every session citation in a rerun matched its
-heading (three of eleven answers wrong before). The sandbox's Seer runs it. A second pass (Haiku checking its own
-answer, a further user turn on the cached prefix) measured, not built: 8 of 8 planted errors caught, about 0.35
+heading (three of eleven answers wrong before). The sandbox's Seer runs it. Then `haiku-6` on `main` (the user: "go ahead ont hte tighten"):
+five lines for the slips left (a speaker only as the record names one, the record's own numbers, a link as fact only
+where the record makes it, the party's mark in a list too, a feature's grant in the book's terms); two runs on high:
+the named slips mostly gone, about 5 small slips in 11 answers each run of other kinds, one empty answer after eight
+lookups. xhigh measured on `haiku-5`: twice the wait, one empty reply, no gain beyond high's own swing. A second
+pass (Haiku checking its own answer, a further user turn on the cached prefix) measured, not built: 8 of 8 planted errors caught, about 0.35
 cents and 12 s a check; a narrow checker fires on 3 of 11 fresh answers; 2 of 22 checks came back empty after many
 lookups.
 
