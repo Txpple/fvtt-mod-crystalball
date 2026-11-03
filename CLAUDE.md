@@ -155,7 +155,10 @@ the named slips mostly gone, about 5 small slips in 11 answers each run of other
 lookups. xhigh measured on `haiku-5`: twice the wait, one empty reply, no gain beyond high's own swing. A second
 pass (Haiku checking its own answer, a further user turn on the cached prefix) measured, not built: 8 of 8 planted errors caught, about 0.35
 cents and 12 s a check; a narrow checker fires on 3 of 11 fresh answers; 2 of 22 checks came back empty after many
-lookups.
+lookups. **Then the empty answers fixed, on `main`** (the user: "we can't have empty answeres"): Haiku ended the
+answer-only hop after a fourth round of lookups with no content at all (2 of 15 rules questions); the Seer now tells
+that hop its lookups are spent and asks once more when a turn writes no words. 24 asks after: none empty, the
+answer-only hop writing all 5 times. The sandbox's Seer runs it; the walk GREEN on the subclass question.
 
 ## The rules this module keeps
 
@@ -209,7 +212,8 @@ lookups.
   out by name in *Left out of the rulebooks*, a line led by `<book id>: ` counting for that book alone, since
   books share chapter names), read off the ball's socket on first need and held,
   searched and read through two tools the model calls (`search_rulebooks`, `read_rulebook`), at most four rounds
-  and eight calls an answer, the last hop answering only. Foundry checks no read permission on a compendium get,
+  and eight calls an answer, the last hop answering only and told its lookups are spent (a turn with no words is
+  asked once more: an empty answer is never the first resort). Foundry checks no read permission on a compendium get,
   so the Seer applies the pack's ownership as `getUserLevel` does, per asker. The tool definitions are the same
   bytes for the whole table (they cache ahead of the instructions). The settings' defaults live in
   `scripts/decide/rulebooks.js` and `seer/src/settings.js`, held equal by a test. No book text in a fixture:

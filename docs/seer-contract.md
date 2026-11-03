@@ -196,7 +196,12 @@ can think through 4,096 before it says a word), `betas: ["server-side-fallback-2
 server-side fallback; true for Sonnet or Opus). With the rulebooks, `tools` as above; a reply that stops on
 `tool_use` has its calls run, and the next hop carries the assistant's content whole (thinking included) and a
 `tool_result` per call (`is_error` for a refused or failed one), up to `config.lookupRounds` (4) rounds and
-`config.lookupCalls` (8) calls, the hop after the last round sent with `tool_choice: { type: "none" }`. A hop the
+`config.lookupCalls` (8) calls, the hop after the last round sent with `tool_choice: { type: "none" }` and a line from
+the Seer after that round's results (a text block after the `tool_result`s): the lookups are spent, answer now from
+what was read. A turn whose hops wrote no words and did not stop on `refusal` is asked once more: the last request
+again with a line from the Seer after it (no words reached the player, answer now), `tool_choice: none` when the
+table has rulebooks; still no words, the ball's empty sentence stands. (Haiku ended the answer-only hop after a
+fourth round of lookups with no content at all in 2 of 15 rules questions measured.) A hop the
 fallback model served goes on with that model. The stored answer is every hop's words joined by a blank line. The response `usage` fields `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens` make the ledger line, priced by
 `config.prices[model]` (per MTok: `input`, `cacheWrite5m`, `cacheWrite1h`, `cacheRead`, `output`); a cache write

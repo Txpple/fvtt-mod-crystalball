@@ -14,9 +14,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { estimateTokens } from "./gaze.js";
-import { EMPTY_TEXT, REFUSAL_TEXT } from "./instructions.js";
+import { EMPTY_TEXT, LOOKUPS_SPENT, NO_WORDS, REFUSAL_TEXT } from "./instructions.js";
 
-export { EMPTY_TEXT, REFUSAL_TEXT };
+export { EMPTY_TEXT, LOOKUPS_SPENT, NO_WORDS, REFUSAL_TEXT };
 
 export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
@@ -84,6 +84,21 @@ export function requestParams(
     cache_control: cacheMarker(config.cacheTtl),
     output_config: { effort: config.effort }
   };
+}
+
+/**
+ * The conversation with a line of the Seer's after it: a text block appended to the last user turn
+ * (after its tool results, where the API wants a turn's own words), or a user turn of its own.
+ */
+export function withLine(messages, line) {
+  const block = { type: "text", text: line };
+  const last = messages.at(-1);
+  if (last?.role !== "user") return [...messages, { role: "user", content: [block] }];
+  const content =
+    typeof last.content === "string"
+      ? [{ type: "text", text: last.content }, block]
+      : [...(last.content ?? []), block];
+  return [...messages.slice(0, -1), { ...last, content }];
 }
 
 /** The usage line from a response's `usage`. */
@@ -369,11 +384,11 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
         lookups: calls
       });
 
-      for (let round = 0; ; round++) {
-        const last = !tools || round >= rounds;
-        const params = requestParams(config, layers, convo, {
+      /** One sampling hop over `msgs`, counted into the answer; `answerOnly` forbids lookups. */
+      const ask = async (msgs, answerOnly) => {
+        const params = requestParams(config, layers, msgs, {
           tools: tools?.definitions ?? null,
-          final: Boolean(tools) && last,
+          final: Boolean(tools) && answerOnly,
           model: hopModel
         });
         const abort = signal
@@ -402,7 +417,7 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
             hop = await run(false, params, abort);
           }
         } catch (err) {
-          err.spend = spentWith(partialSpend(err, layers, convo, abort));
+          err.spend = spentWith(partialSpend(err, layers, msgs, abort));
           throw err;
         }
 
@@ -414,7 +429,12 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
         if (words.trim()) texts.push(words);
         // A turn the fallback model served goes on with that model, whose thinking it carries.
         if (hop.model && hop.model !== hopModel) hopModel = hop.model;
+        return hop;
+      };
 
+      for (let round = 0; ; round++) {
+        const last = !tools || round >= rounds;
+        const hop = await ask(convo, last);
         const uses = (hop.content ?? []).filter(b => b?.type === "tool_use");
         if (last || hop.stop_reason !== "tool_use" || !uses.length) break;
         const results = [];
@@ -447,11 +467,23 @@ export function createModel({ apiKey, stub = false, config, log, client = null }
           err.spend = spentWith({ usage: NO_USAGE, cost: 0, model: served, estimated: false });
           throw err;
         }
+        // The next hop may only answer: it is told so, after the results, or it may end with nothing.
+        if (round + 1 >= rounds) results.push({ type: "text", text: LOOKUPS_SPENT });
         convo = [
           ...convo,
           { role: "assistant", content: hop.content },
           { role: "user", content: results }
         ];
+      }
+
+      // A turn that wrote no words is asked once more, the last request with the Seer's line after
+      // it, before the ball's empty sentence stands. A refusal is an answer and is not asked again.
+      if (!texts.length && final?.stop_reason !== "refusal") {
+        log.warn("model: a turn wrote no words; asking once more", {
+          stop: final?.stop_reason ?? null,
+          lookups: calls
+        });
+        await ask(withLine(convo, NO_WORDS), true);
       }
 
       let text = texts.join("\n\n");

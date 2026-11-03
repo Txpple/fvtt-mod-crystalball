@@ -34,6 +34,17 @@ export const REFUSAL_TEXT = "The ball stays clouded on that: the model declined 
 export const EMPTY_TEXT = "The ball clouds over and shows nothing.";
 
 /**
+ * The Seer's line after the last round of lookups, ahead of the hop that may only answer: without
+ * it Haiku sometimes ended that hop with no content at all, its lookups unfinished in its mind.
+ */
+export const LOOKUPS_SPENT =
+  "This line is from the Seer, not the player: this answer's lookups are spent. Write your answer to the player now, from what you have read.";
+
+/** The Seer's line when a turn reached the player with no words: asked once more, then EMPTY_TEXT. */
+export const NO_WORDS =
+  "This line is from the Seer, not the player: your last turn reached the player with no words. Write your answer to the player now, from what you have.";
+
+/**
  * The instructions layer: the model's harness, its rulebooks section when the table opens any
  * books, then the DM's notes for this table when there are any. The notes are the DM's own words
  * and do carry instructions: the ball's manner, what to decline, house facts. They win over the

@@ -5,13 +5,16 @@ import {
   createModel,
   dearestTtl,
   EMPTY_TEXT,
+  LOOKUPS_SPENT,
+  NO_WORDS,
   FALLBACK_BETA,
   priceUsage,
   REFUSAL_TEXT,
   requestParams,
   stubAnswer,
   systemBlocks,
-  usageOf
+  usageOf,
+  withLine
 } from "../src/model.js";
 import { quietLog } from "./helpers.js";
 
@@ -455,13 +458,14 @@ describe("what an unfinished call spent", () => {
 });
 
 describe("an answer with no words", () => {
-  it("is stored as the ball's fixed sentence, never as an empty turn", async () => {
+  it("is asked once more, then stored as the ball's fixed sentence, never as an empty turn", async () => {
     for (const stop_reason of ["max_tokens", "pause_turn", "end_turn"]) {
       const client = fakeClient({
         deltas: [],
         final: { stop_reason, content: [{ type: "thinking", thinking: "" }] }
       });
-      const model = createModel({ config: CONFIG, log: quietLog(), client });
+      const log = quietLog();
+      const model = createModel({ config: CONFIG, log, client });
       const pieces = [];
       const result = await model.answer({
         layers,
@@ -472,8 +476,50 @@ describe("an answer with no words", () => {
       });
       expect(result.text).toBe(EMPTY_TEXT);
       expect(pieces).toEqual([EMPTY_TEXT]);
+      // One more ask, the Seer's line after the player's words, and no third.
+      expect(client.calls.beta).toHaveLength(2);
+      expect(client.calls.beta[1].params.messages.at(-1).content.at(-1)).toEqual({
+        type: "text",
+        text: NO_WORDS
+      });
+      expect(
+        log.lines.some(l => l.message === "model: a turn wrote no words; asking once more")
+      ).toBe(true);
+      // Both asks are counted.
+      expect(result.usage.output).toBe(100);
     }
     expect(EMPTY_TEXT).toBe("The ball clouds over and shows nothing.");
+  });
+
+  it("is never asked again after a refusal", async () => {
+    const client = fakeClient({ deltas: [], final: { stop_reason: "refusal", content: [] } });
+    const model = createModel({ config: CONFIG, log: quietLog(), client });
+    const result = await model.answer({
+      layers,
+      messages,
+      meta: {},
+      message: "x",
+      onDelta: () => {}
+    });
+    expect(result.text).toBe(REFUSAL_TEXT);
+    expect(client.calls.beta).toHaveLength(1);
+  });
+});
+
+describe("withLine", () => {
+  it("puts the Seer's line after a user turn's own content, or in a turn of its own", () => {
+    const line = { type: "text", text: "L" };
+    expect(withLine([{ role: "user", content: "Q" }], "L")).toEqual([
+      { role: "user", content: [{ type: "text", text: "Q" }, line] }
+    ]);
+    const results = [{ type: "tool_result", tool_use_id: "t", content: "r" }];
+    expect(withLine([{ role: "user", content: results }], "L")).toEqual([
+      { role: "user", content: [...results, line] }
+    ]);
+    expect(withLine([{ role: "assistant", content: "A" }], "L").at(-1)).toEqual({
+      role: "user",
+      content: [line]
+    });
   });
 });
 
@@ -628,10 +674,42 @@ describe("an answer that looks things up", () => {
       "none"
     ]);
     expect(run).toHaveBeenCalledTimes(8);
-    const results = client.calls[2].params.messages.at(-1).content;
-    expect(results.slice(-2).every(r => r.is_error === true)).toBe(true);
+    const content = client.calls[2].params.messages.at(-1).content;
+    // The answer-only hop is told its lookups are spent, after the last round's results.
+    expect(content.at(-1)).toEqual({ type: "text", text: LOOKUPS_SPENT });
+    expect(content.slice(-3, -1).every(r => r.is_error === true)).toBe(true);
+    // An earlier round's results carry no such line.
+    expect(
+      client.calls[1].params.messages.at(-1).content.every(b => b.type === "tool_result")
+    ).toBe(true);
     expect(result.lookups).toBe(10);
     expect(result.text).toBe("Done.");
+  });
+
+  it("asks once more when the answer-only hop after the lookups comes back with nothing", async () => {
+    const use = toolUse("t1", "search_rulebooks", { query: "smite" });
+    const client = hopsClient([
+      { uses: [use] },
+      { stop: "end_turn" },
+      { text: "Divine Smite is a bonus action." }
+    ]);
+    const run = vi.fn(async () => ({ content: "hit" }));
+    const config = { ...CONFIG, lookupRounds: 1, lookupCalls: 8 };
+    const model = createModel({ config, log: quietLog(), client });
+    const result = await call2(model, { definitions: DEFS, run });
+    expect(client.calls).toHaveLength(3);
+    expect(client.calls.map(c => c.params.tool_choice?.type ?? "auto")).toEqual([
+      "auto",
+      "none",
+      "none"
+    ]);
+    const retry = client.calls[2].params.messages.at(-1).content;
+    expect(retry.slice(-2)).toEqual([
+      { type: "text", text: LOOKUPS_SPENT },
+      { type: "text", text: NO_WORDS }
+    ]);
+    expect(result.text).toBe("Divine Smite is a bonus action.");
+    expect(result.lookups).toBe(1);
   });
 
   it("gives a failed lookup back to the model as an error result, and goes on", async () => {

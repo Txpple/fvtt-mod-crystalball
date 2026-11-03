@@ -73,7 +73,8 @@ the conversation, which change with every hit point and turn. With `refusalFallb
 beta client with `fallbacks: "default"`, so a request the model declines on policy grounds is answered by the API's
 fallback model in the same call. With the rulebooks the tools ride ahead of the first system block (the same
 bytes for the whole table, so they cache with the instructions); a round of tool calls is run and its results go
-back, at most `lookupRounds` rounds and `lookupCalls` calls an answer, the last hop answering only. Each hop has
+back, at most `lookupRounds` rounds and `lookupCalls` calls an answer, the last hop answering only and told its
+lookups are spent; a turn that wrote no words is asked once more before the ball says it shows nothing. Each hop has
 `callTimeoutMs` of its own, and the usage and cost are every hop's. Prices per million tokens are in
 `config.json` and make the ledger's cost; Haiku's `longPrompt` rates price a request whose prompt passes 100,000
 tokens, as the API bills it.
