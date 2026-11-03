@@ -97,8 +97,7 @@ launcher's Seer on the real model, the GM page's window lit by the companion por
 through the reusable workflow (the annotated `v1.0.5`, `latest` serving it), installed on prod through the installer with no
 player connected (PASS, 18/18 served files byte-identical with the zip), the box's Seer at `v1.0.5` by the guide's Updating
 over Tailscale SSH (its browser check passed by the user), "foundry: connected" at once, `healthz` 1.0.5 and a forged id 401
-through the public hostname; the sandbox runs the same 1.0.5 files, deployed `--local` before the walk. **Unreleased
-on `main`: the cache split** (the user, on the sandbox's daily cap tripped by a test day: "how can we optimze costs",
+through the public hostname; the sandbox runs the same 1.0.5 files, deployed `--local` before the walk. **1.0.6 released and on prod the same night: Haiku, the cache split, question caps by model** (the user, on the sandbox's daily cap tripped by a test day: "how can we optimze costs",
 then "Yes, make it"). Measured first on the sandbox's ledger: 29 real calls, $5.27 on Opus, $4.02 of it ten cold
 writes of the gaze after lulls past the five-minute cache (the same tokens $2.64 on Sonnet 5.5, $0.14 on Haiku 5.5);
 a player's gaze 48k tokens, the lore 37k of it (the Session Diary 16.7k, the handouts 11.3k), the party layer
@@ -126,7 +125,13 @@ user's word ("if we are on sonnet, the current limits on questions per hour/per 
 can be unlimited"), a limits table by model: `limitsByModel` merged over `limits` for the configured model, `null`
 for a user's hour or day no cap; Haiku's entry lifts both, Sonnet and Opus keep 10 and 40, the dollar caps stand for
 every model; `usage/me` and `done` carry `null` for no cap and the window shows *n today*. `verify` green (384
-tests); deployed `--local`, byte-identical; the sandbox's override down to its $10 day.
+tests); deployed `--local`, byte-identical; the sandbox's override down to its $10 day. Released on the user's word
+("Yes, release 1.0.6"): the annotated `v1.0.6` through the reusable workflow, `latest` serving it; the installer
+PASS on prod with no player connected, 18/18 served files byte-identical with the zip; the box's Seer at `v1.0.6` by
+the guide's Updating over SSH (no `CONFIG` there, so the committed defaults: Haiku at high), "foundry: connected"
+at once, `healthz` 1.0.6 on Haiku and a forged id 401 through the public hostname. Then, on the user's word ("once
+done, copy prod to sandbox"), prod mirrored to the sandbox over SSH; the sandbox's Crystal Ball byte-identical with
+`v1.0.6`, its Seer up at 1.0.6 beside Foundry.
 
 ## The rules this module keeps
 
