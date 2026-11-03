@@ -66,12 +66,9 @@ while the day's others came from the machine itself) read `localhost:30001` as i
 base, then, when that is a path on the page's own origin, the same path on **the companion port**, 30001 of the host
 the browser reached Foundry by; the first `healthz` that answers is the Seer for every later call, and a dark window
 asks again every ten seconds. The Seer's `CORS_ORIGIN` takes one origin, a list, or `*`; its reconnect backoff
-caps at fifteen seconds (it had reached a minute, and the ball stayed dark a minute after a Foundry restart). The
-sandbox: `seer/.env` with `BIND=::` and `CORS_ORIGIN=*`, the Service URL back at the default `/crystalball`, and the
-Seer as the Task Scheduler task *Open Roll 5e Crystal Ball Seer*, installed by `tools/sandbox-seer.mjs install` (a
-hidden PowerShell runs the tool's supervisor, which starts the Seer again whenever it exits; at each logon and on
-demand; the log `seer/data/seer.log`; an unelevated account may register no boot trigger and no S4U logon, both
-refused), never from a terminal; `tools/sandbox-service-url.mjs` folded into `sandbox-seer.mjs url --default`.
+caps at fifteen seconds (it had reached a minute, and the ball stayed dark a minute after a Foundry restart). The sandbox: `seer/.env` with `BIND=::` and `CORS_ORIGIN=*`, the Service URL back at the default `/crystalball`,
+and the Seer as a Windows scheduled task by a `tools/sandbox-seer.mjs` (replaced in 1.0.5, below);
+`tools/sandbox-service-url.mjs` retired.
 Checked: `healthz` on 127.0.0.1, ::1, the Wi-Fi and the Tailscale address; a preflight from a LAN origin answered
 `*`; no window among the task's three processes; `stop` and `start` through the task; the Seer rejoining after
 `local-foundry.mjs restart --force`; `verify` green (377 tests); 1.0.4 deployed `--local`, byte-identical, the
@@ -83,16 +80,32 @@ Seer at `v1.0.4` by the guide's Updating over SSH, "foundry: connected" at once,
 401 through the public hostname. Known: the
 MCP's restart and mirror guards count the ball's user among connected users (prod's `/api/status` reads 1 with the
 box's Seer up), so the local restart needed `--force`; the MCP's guards discount it since the same evening (its
-`scripts/lib/seer.mjs`, unreleased on its `main`).
+`scripts/lib/seer.mjs`, unreleased on its `main`). **1.0.5 on `main`, unreleased: the review's corrections** (an adversarial review of 1.0.3 to 1.0.4 at the
+user's request; the user: "yes lets go"). The scheduled task had died with STATUS_CONTROL_C_EXIT, a console event
+reaching the hidden PowerShell's console, and its detached-launch repair registered a command with no path
+separator; the tool is deleted and the task removed. The sandbox's Seer is now started beside Foundry by the MCP's
+`local-foundry.mjs start` (a detached, windowless process, its lines in `seer/data/seer.log`, its pid beside
+`headless.pid`; `stop` ends it first, `restart` does both, `status` shows it; a crash or a reboot needs a `start`,
+as the sandbox's Foundry does; `npm run seer:dev` stays the plain terminal way). The window: the companion
+candidate only on a plain-http page with the default setting (an https page, prod's, gets one candidate: the
+tunnel's hostname hangs on port 30001, so 1.0.4's prod window would have shown Gazing… 15 s before Dark with the
+Seer or the route down); a 3-second healthz probe with no session header, a simple GET with no preflight; the
+found base kept only by the search still current; a dark window re-asks only for reasons that can heal (never
+after a 401 or 403, where 1.0.4 asked every ten seconds for ever) and stays dark on screen while it asks. `verify`
+green (378 tests); 1.0.5 deployed `--local`; `tools/live-check.mjs --walk --default-url` GREEN against the
+launcher's Seer on the real model, the GM page's window lit by the companion port, Kartor's answer in 4.5 s. Not
+released, not pushed; prod on 1.0.4; the box's Seer to `v1.0.5` with the release.
 
 ## The rules this module keeps
 
 - **The window talks only to the Seer, the Seer only to Foundry and the model.** No client holds a key or calls
   the model; on a box the Seer binds `127.0.0.1` and is reached through a reverse proxy or tunnel rule on
-  Foundry's own origin (prod); on a sandbox it binds every address and the window finds it on **the companion
-  port**, 30001 of whatever host the browser reached Foundry by, with CORS for the sandbox's origins
-  (`CORS_ORIGIN`: one, a list, or `*`), so a sandbox keeps the default Service URL and a mirror cannot darken it.
-  `docs/seer-contract.md` is the
+  Foundry's own origin (prod); on a sandbox it binds every address and, on a plain-http page with the default
+  Service URL, the window also looks on **the companion port**, 30001 of whatever host the browser reached Foundry
+  by (never on an https page, never for a full URL), with CORS for the sandbox's origins (`CORS_ORIGIN`: one, a
+  list, or `*`), so a sandbox keeps the default Service URL and a mirror cannot darken it. A dark window asks
+  again every ten seconds only while the reason can heal, staying dark on screen meanwhile, never after a
+  refusal. `docs/seer-contract.md` is the
   contract: endpoints, the `X-Foundry-Session` header, the SSE events, the error bodies, the settings the Seer
   reads, the gaze's layers, the stub model's sentence. A change to it is made there first.
 - **Identity is Foundry's.** Every request carries the player's own session id; the Seer opens a socket to Foundry
@@ -166,8 +179,8 @@ box's Seer up), so the local restart needed `--force`; the MCP's guards discount
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.
 - `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--default-url` for
   the companion-port search, `--asker <member>`); `tools/fake-seer.mjs`: a stub-only stand-in Seer for the walk,
-  never deployed; `tools/ball-user.mjs`: the ball's user on a sandbox; `tools/sandbox-seer.mjs`: the Seer as a
-  Windows scheduled task on a sandbox (`install`, `status`, `start`, `stop`, `restart`, `log`, `uninstall`, `url`),
-  the one way the sandbox's Seer runs, never from a session's terminal.
+  never deployed; `tools/ball-user.mjs`: the ball's user on a sandbox. On this suite's sandbox the Seer is started
+  beside Foundry by the MCP's `local-foundry.mjs start` (`stop`, `restart` and `status` cover it; the suite's
+  CLAUDE.md), never from a session's terminal or background job; `npm run seer:dev` is the plain terminal way.
 - **Identity in the window**: `game.socket.session.sessionId` first (Foundry 14's session cookie is HttpOnly), the
   cookie only for an older build; the walk asserts the two are equal.

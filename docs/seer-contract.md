@@ -19,18 +19,26 @@ it); the client takes the socket's copy first and falls back to a `session` cook
 (older builds); the two are the same value. No other authentication. No cookies are relied on.
 
 - prod: `serviceUrl` is the same-origin path `/crystalball` (the tunnel routes it to the Seer; no CORS).
-- a sandbox: `serviceUrl` stays at that default. The path names Foundry's own origin, which a sandbox with no
-  proxy serves nothing at, so the window also tries **the companion port**: the same path on port 30001 (the
-  Seer's default `PORT`) of the host the page reached Foundry by, `http://localhost:30001/crystalball` from the
-  machine itself and `http://<that host>:30001/crystalball` from another device on the network. The Seer there
-  binds every address (`BIND=::`) and answers CORS for the sandbox's origins (`CORS_ORIGIN`, one origin, a list
-  or `*`; preflight `OPTIONS`, `Access-Control-Allow-Origin: <the origin, or *>`, `Access-Control-Allow-Headers:
-  Content-Type, X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`). A `serviceUrl` that
-  names an origin outright is asked alone.
-- the window's search: `healthz` at each candidate in turn, the first that answers 200 is the Seer for every
-  later call (a Seer that answers but reports no link or no world is still it: the ball is dark for that reason).
-  No candidate answering, the ball is dark and the window asks again every ten seconds while it is open; a
-  change to `serviceUrl` starts the search over.
+- a sandbox: `serviceUrl` stays at that default. On a plain-http page the path names Foundry's own origin, which
+  a sandbox with no proxy serves nothing at, so the window also tries **the companion port**: the same path on
+  port 30001 (the Seer's default `PORT`) of the host the page reached Foundry by,
+  `http://localhost:30001/crystalball` from the machine itself and `http://<that host>:30001/crystalball` from
+  another device on the network. The companion is tried only on an `http:` page whose setting is the default
+  (empty, or a bare path with no scheme, on the page's own origin): an `https:` page sits behind a proxy or tunnel,
+  where the Seer answers on the page's own origin and a bare port answers nothing or hangs, so it gets the one
+  candidate; a full URL, on Foundry's origin or another, is asked alone (a Seer on another `BASE_PATH` or port is
+  named that way and gets no companion); a page already on port 30001 gets none. The Seer on a sandbox binds
+  every address (`BIND=::`) and answers CORS for the sandbox's origins (`CORS_ORIGIN`, one origin, a list or `*`;
+  preflight `OPTIONS`, `Access-Control-Allow-Origin: <the origin, or *>`, `Access-Control-Allow-Headers:
+  Content-Type, X-Foundry-Session`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`).
+- the window's search: `healthz` at each candidate in turn, a 3-second probe with no `X-Foundry-Session` header
+  (healthz wants none; a simple GET, no preflight); the first that answers 200 is the Seer for every later call
+  (a Seer that answers but reports no link or no world is still it: the ball is dark for that reason), and the
+  answer counts only while the search that found it is the current one (a `serviceUrl` change starts a new
+  search). No candidate answering, the ball is dark. A dark window asks again every ten seconds while it is open
+  and the reason can heal: the Seer unreachable, its link or its world down, a server or network failure of the
+  sitting call; it stays dark on screen while it asks and lights when an answer comes. A refusal (401, 403, any
+  other 4xx) is final until Retry or a reopen; Retry asks at once and shows the loading state.
 
 All responses are JSON (`application/json`) except `POST chat`, which is `text/event-stream`.
 

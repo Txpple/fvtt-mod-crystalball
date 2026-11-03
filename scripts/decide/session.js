@@ -13,10 +13,12 @@ export const MESSAGE_LIMIT = 4000;
 
 /**
  * The companion port: where a Seer beside a Foundry with no proxy listens (the Seer's default
- * `PORT`). A `serviceUrl` that is a bare path names Foundry's own origin, which a sandbox serves
- * nothing at; the window then also tries the same path on this port of the page's own host, so a
- * sandbox needs no Service URL at all, and one reached from another device on the network finds
- * the Seer beside the Foundry it is talking to rather than on itself.
+ * `PORT`). On a plain-http page the default `serviceUrl`, a bare path, names Foundry's own origin,
+ * which a sandbox serves nothing at; the window then also tries the same path on this port of the
+ * page's own host, so a sandbox needs no Service URL at all, and one reached from another device on
+ * the network finds the Seer beside the Foundry it is talking to rather than on itself. An https
+ * page is behind a proxy or tunnel, where the Seer answers on the page's own origin and a bare
+ * port answers nothing (or hangs), so it never tries this port.
  */
 export const COMPANION_PORT = 30001;
 
@@ -64,10 +66,11 @@ export function serviceBase(serviceUrl, origin) {
 }
 
 /**
- * Where the window looks for the Seer, in order: the Service URL's base, then, when that setting
- * is a path on the page's own origin (the default, prod's), the same path on the companion port
- * of the page's host. A setting that names another origin outright is tried alone. Empty when the
- * setting names no http(s) service.
+ * Where the window looks for the Seer, in order: the Service URL's base, then, on a plain-http
+ * page whose setting is the default (empty, or a bare path with no scheme, on the page's own
+ * origin), the same path on the companion port of the page's host. An https page gets the one
+ * candidate; a full URL, on the page's origin or another, is asked alone; a page already on the
+ * companion port gets no second candidate. Empty when the setting names no http(s) service.
  * @param {unknown} serviceUrl  the Service URL setting
  * @param {{ origin: string, protocol: string, hostname: string, port: string }} location  the page's
  * @returns {string[]}
@@ -75,12 +78,16 @@ export function serviceBase(serviceUrl, origin) {
 export function serviceCandidates(serviceUrl, location) {
   const first = serviceBase(serviceUrl, location.origin);
   if (!first) return [];
-  const bases = [first];
-  if (first.startsWith(`${location.origin}/`) && String(location.port) !== String(COMPANION_PORT)) {
-    const path = first.slice(location.origin.length);
-    bases.push(`${location.protocol}//${location.hostname}:${COMPANION_PORT}${path}`);
-  }
-  return bases;
+  const raw = typeof serviceUrl === "string" ? serviceUrl.trim() : "";
+  const barePath = !raw || !/^[a-z][a-z0-9+.-]*:/i.test(raw);
+  const companion =
+    barePath &&
+    location.protocol === "http:" &&
+    first.startsWith(`${location.origin}/`) &&
+    String(location.port) !== String(COMPANION_PORT);
+  if (!companion) return [first];
+  const path = first.slice(location.origin.length);
+  return [first, `${location.protocol}//${location.hostname}:${COMPANION_PORT}${path}`];
 }
 
 /**

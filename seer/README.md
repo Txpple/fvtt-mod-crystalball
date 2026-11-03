@@ -43,26 +43,18 @@ nothing to Foundry.
 npm install
 cp seer/.env.example seer/.env   # fill in BALL_PASSWORD and the sandbox's BIND and CORS_ORIGIN (below);
                                  # leave ANTHROPIC_API_KEY empty for the stub
-npm run seer:dev                 # in a terminal, for a session of work
+npm run seer:dev
 curl -s http://127.0.0.1:30001/crystalball/healthz
 ```
 
-The world's *Service URL* stays at its default, `/crystalball`: a sandbox has no proxy at that path, so the window
-tries the same path on the companion port, 30001, of the host the browser reached Foundry by, which is where the
-Seer listens. Set `BIND=::` so the Seer answers on every address (a browser on another device on the network
+The world's *Service URL* stays at its default, `/crystalball`: a sandbox has no proxy at that path, and on a
+plain-http page the window also tries the same path on the companion port, 30001, of the host the browser reached
+Foundry by, which is where the Seer listens (an https page, behind a proxy, asks its own origin alone). Set `BIND=::` so the Seer answers on every address (a browser on another device on the network
 reaches it by the sandbox's host) and `CORS_ORIGIN=*` so it answers whatever origin that browser names Foundry
 by (`http://localhost:30000` alone covers a browser on the machine itself). `LOG_LEVEL=debug` prints each call's
 layer sizes, the gaze's meta and the cache figures. The entry point is `seer/src/main.js` (it checks for Node 24
 and loads `start.js`); `config.js` reads the environment and the config.
 
-**With no terminal to keep open** (a Windows sandbox): `node tools/sandbox-seer.mjs install` registers a Task
-Scheduler task that runs the Seer from this clone, hidden, in the logon session of the user who installs it: it
-starts at each logon and on demand, a supervisor starts the Seer again whenever it exits, the task is started
-again a minute after the supervisor stops, and every line goes to `seer/data/seer.log`; the Seer waits for
-Foundry by itself and rejoins when Foundry restarts. It runs from logon to logoff (an account that is not
-elevated may register nothing wider: no boot trigger, no "whether the user is logged on or not"). `status`,
-`start`, `stop`, `restart`, `log` and `uninstall` are the other commands; `install` again after Node or the
-clone moves. A box runs the systemd unit in `deploy/` instead.
 
 Without `ANTHROPIC_API_KEY` (or with `MODEL_STUB=1`) the Seer makes no API call: it answers the contract's stub
 sentence, which names what the gaze holds, so a live check can assert on it for nothing.

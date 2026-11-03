@@ -24,10 +24,20 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const CALL_TIMEOUT_MS = 15_000;
 
 /**
- * A dark window asks again this often, so a Seer that comes up, or finds its world again, lights
- * the ball without a click; the Retry button is the same ask, sooner.
+ * The search's healthz probe: a Seer beside Foundry answers at once, and a candidate that hangs
+ * (a tunnel's hostname on a port it does not serve) must not hold the ball in "Gazing…" for long.
+ */
+const PROBE_TIMEOUT_MS = 3_000;
+
+/**
+ * A dark window asks again this often while the reason can heal (the Seer unreachable, its link or
+ * its world down, a server or network failure), so a Seer that comes up, or finds its world again,
+ * lights the ball without a click; a refusal is final until Retry, which is the same ask, sooner.
  */
 const DARK_RETRY_MS = 10_000;
+
+/** Whether a failed sitting call is one that can heal on its own: a network failure or a 5xx. */
+const heals = status => !status || status >= 500;
 
 /**
  * The Seer gives the model a minute a hop, and an answer that looks rules up takes a hop per round
@@ -66,25 +76,29 @@ function endpoint(path, base = seerBase ?? candidates()[0]) {
   return base ? `${base}/${path}` : null;
 }
 
-function headers(json) {
+function headers(json, withSession = true) {
   const h = {};
-  const id = sessionId();
+  const id = withSession ? sessionId() : null;
   if (id) h["X-Foundry-Session"] = id;
   if (json) h["Content-Type"] = "application/json";
   return h;
 }
 
-/** One JSON call to the Seer: `{ ok, status, body }`. A network failure, or no URL, is status 0. */
-async function call(path, { method = "GET", body, base } = {}) {
+/**
+ * One JSON call to the Seer: `{ ok, status, body }`. A network failure, or no URL, is status 0.
+ * The search's probe passes `withSession: false` (healthz wants no id; without the header the
+ * probe is a simple GET, no preflight) and its own short timeout.
+ */
+async function call(path, { method = "GET", body, base, timeoutMs = CALL_TIMEOUT_MS, withSession = true } = {}) {
   const url = endpoint(path, base);
   if (!url) return { ok: false, status: 0, body: null };
   try {
     const res = await fetch(url, {
       method,
-      headers: headers(body !== undefined),
+      headers: headers(body !== undefined, withSession),
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
-      signal: AbortSignal.timeout(CALL_TIMEOUT_MS)
+      signal: AbortSignal.timeout(timeoutMs)
     });
     const data = await res.json().catch(() => null);
     return { ok: res.ok, status: res.status, body: data };
@@ -98,11 +112,14 @@ async function call(path, { method = "GET", body, base } = {}) {
  * Probe each candidate's healthz in order and settle on the first Seer that answers: that call's
  * `{ ok, status, body }`, or the last failure when none does. A Seer that answers but reports no
  * link or no world is still the Seer: the ball is dark for its reason, not for one further along.
+ * The base found is kept only while the search that found it is still `current()`: a setting
+ * change mid-search starts another, and this one's answer must not outlive it.
  */
-async function findSeer() {
+async function findSeer(current = () => true) {
   let last = { ok: false, status: 0, body: null };
   for (const base of candidates()) {
-    const health = await call("healthz", { base });
+    const health = await call("healthz", { base, timeoutMs: PROBE_TIMEOUT_MS, withSession: false });
+    if (!current()) return health;
     if (health.ok) {
       seerBase = base;
       return health;
@@ -400,43 +417,60 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     return !list || list.scrollHeight - list.scrollTop - list.clientHeight < 48;
   }
 
-  #goDark(line) {
+  /**
+   * The ball goes dark with its line; `healable` arms the next ask (the Seer unreachable, its link
+   * or world down, a server or network failure), a refusal does not. A window already dark with
+   * the same line is left as drawn.
+   */
+  #goDark(line, healable = false) {
+    const changed = this.#phase !== "dark" || this.#darkLine !== line;
     this.#phase = "dark";
     this.#darkLine = line;
     this.#busy = false;
-    this.#armRetry();
-    return this.rendered ? this.render() : undefined;
+    if (healable) this.#armRetry();
+    else {
+      clearTimeout(this.#retryTimer);
+      this.#retryTimer = null;
+    }
+    return changed && this.rendered ? this.render() : undefined;
   }
 
-  /** A dark window asks again after DARK_RETRY_MS, while it is open and still dark. */
+  /** A dark window asks again after DARK_RETRY_MS, while it is open and still dark, staying dark meanwhile. */
   #armRetry() {
     clearTimeout(this.#retryTimer);
     this.#retryTimer = setTimeout(() => {
       this.#retryTimer = null;
-      if (this.rendered && this.#phase === "dark") void this.reload();
+      if (this.rendered && this.#phase === "dark") void this.reload({ quiet: true });
     }, DARK_RETRY_MS);
   }
 
   /**
    * Ask the Seer from the start: healthz (dark when it does not answer, or when it has no link
-   * to Foundry or no open world), then the open sitting and the count.
+   * to Foundry or no open world), then the open sitting and the count. A `quiet` reload (the dark
+   * window's own re-ask) keeps what is on screen while it asks; the first load and Retry show the
+   * loading state.
    */
-  async reload() {
+  async reload({ quiet = false } = {}) {
     this.#abandon();
     const gen = this.#gen;
-    this.#phase = "loading";
-    if (this.rendered) await this.render();
-    const health = await findSeer();
-    if (gen !== this.#gen) return;
+    const current = () => gen === this.#gen;
+    if (!quiet) {
+      this.#phase = "loading";
+      if (this.rendered) await this.render();
+    }
+    const health = await findSeer(current);
+    if (!current()) return;
     this.#model = health.ok ? modelLabel(health.body?.model) : null;
     const reason = health.ok ? darkReason(health.body) : "unreachable";
-    if (reason) return this.#goDark(t(`dark.${reason}`));
+    if (reason) return this.#goDark(t(`dark.${reason}`), true);
     const [sitting, usage] = await Promise.all([call("sittings/current"), call("usage/me")]);
-    if (gen !== this.#gen) return;
-    if (!sitting.ok) return this.#goDark(failureLine(sitting.status, sitting.body));
+    if (!current()) return;
+    if (!sitting.ok) return this.#goDark(failureLine(sitting.status, sitting.body), heals(sitting.status));
     const turns = Array.isArray(sitting.body?.turns) ? sitting.body.turns : [];
     this.#turns = turns.filter(turn => turn?.role === "user" || turn?.role === "ball").map(turn => ({ role: turn.role, text: String(turn.text ?? "") }));
     this.#usage = usage.ok ? usage.body : null;
+    clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
     this.#phase = "ready";
     this.#toBottom = true;
     if (this.rendered) await this.render();

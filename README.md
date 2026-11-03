@@ -68,7 +68,7 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Enabled | on | Off hides the button and the Seer answers no one. |
-| Service URL | `/crystalball` | Where the window calls the Seer. The default is a path on Foundry's own origin, which a hosted world's tunnel or proxy rule routes to the Seer; where that path answers nothing (a sandbox, with no proxy) the window tries the same path on port 30001 of the host it reached Foundry by, the Seer's own port, so a sandbox needs no setting, from the machine itself or from another device on the network. A full URL names a Seer elsewhere and is asked alone. |
+| Service URL | `/crystalball` | Where the window calls the Seer. The default is a path on Foundry's own origin, which a hosted world's tunnel or proxy rule routes to the Seer. On a plain-http page with that default (a sandbox, with no proxy) the window also tries the same path on port 30001 of the host it reached Foundry by, the Seer's own port, so a sandbox needs no setting, from the machine itself or from another device on the network; an https page asks its own origin alone. A full URL, on Foundry's origin or elsewhere, is asked alone. |
 | Table notes | empty | The DM's standing notes to the ball: its manner, what to decline, house facts. Read before anything else. |
 | Who may ask | every player | Every user, or only the listed user ids. |
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |
@@ -96,18 +96,14 @@ tools/
   live-check.mjs               the sandbox walk (a GM page, a temporary player, a sitting)
   fake-seer.mjs                a stub-only stand-in for the Seer, for the walk alone; never deployed
   ball-user.mjs                makes or resets the ball's user on a sandbox
-  sandbox-seer.mjs             the Seer as a Windows scheduled task on a sandbox: install, start, stop,
-                               status, the log, the world's Service URL
 ```
 
 ## Development
 
 There is no build step: the module is plain ES modules loaded straight from `scripts/`, and the Seer is plain Node
 run from `seer/src/main.js`. Run `npm install` once; `npm run verify` is the gate for both halves: Biome and the
-unit tests. `npm run seer:dev` runs the Seer with `seer/.env` in the terminal; on a Windows sandbox
-`node tools/sandbox-seer.mjs install` runs it as a scheduled task instead, with no terminal to keep open
-(`seer/README.md`). Without an `ANTHROPIC_API_KEY` it answers from a stub model, which is what the tests and the
-live check use. `scripts/kit/` and `tests/kit/` are copies the suite's
+unit tests. `npm run seer:dev` runs the Seer with `seer/.env`; without an `ANTHROPIC_API_KEY` it answers from a
+stub model, which is what the tests and the live check use. `scripts/kit/` and `tests/kit/` are copies the suite's
 `tools/kit-sync.mjs` writes: change the kit there, never here.
 
 Releases: bump `version` and the `download` URL in `module.json` together and commit, then push an
