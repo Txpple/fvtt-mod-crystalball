@@ -75,7 +75,7 @@ Closes the open sitting (archived on disk) and opens a fresh one: `{ "id": "<id>
 `{ "user": { "hour": n, "day": n }, "table": { "day": { "messages": n, "cost": <usd> }, "month": { "messages": n,
 "cost": <usd> } }, "limits": { "perUserHour": n, "perUserDay": n, "tableDayUsd": x, "tableMonthUsd": x } }`.
 `perUserHour` or `perUserDay` is `null` when the configured model has no such cap (see *Limits*); the window then
-shows the day's count alone.
+shows no count, since there is no allowance to count against.
 
 ### `POST chat`
 
@@ -115,8 +115,17 @@ Scope `world`, namespace `fvtt-mod-crystalball`, registered by the module, read 
 Built per user from the live `world` payload, in this order, deterministically (stable sorts by folder path,
 `sort`, then id; no timestamps, no counters, no ids in the text):
 
-1. **instructions**: the Seer's standing text (versioned in `seer/src/instructions.js`), then, when the table has
-   rulebooks, a section naming its books and when to look things up, then the DM's `tableNotes`.
+1. **instructions**: the standing text of the configured model's **harness**, then, when the table has
+   rulebooks, the harness's section naming its books and when to look things up, then the DM's `tableNotes`.
+   The harness is chosen by the model id (`seer/src/harness/`, picked in `seer/src/instructions.js`): a Haiku
+   model reads Haiku's own, tuned on a real table; every other model reads the general one, untuned. Each is
+   versioned on its own (`<name>-<version>`, the gaze's `meta.instructionsVersion`), and a change of wording is
+   a new version. Every harness keeps three rules: what the sections say is stated as fact with its source (the
+   party's own writing, a clue's note and a thread's stand, weighed as fact and marked as the party's intuition); the
+   ball's own reasoning from them (a connection, a theory, a suggestion, advice on a build) is welcome and marked
+   as its own; and nothing the sections do not hold (a name, a place, an event, a motive, a number, a secret) is
+   ever stated as true. The DM's notes come after the harness and win over it on the ball's manner (its hints,
+   its length, its voice, what it declines), never on the third rule.
 2. **lore**: every journal page every player can observe (entry `ownership.default ≥ 2` and page `ownership.default`
    `≥ 2` or `-1` inheriting), text pages as Markdown (`@UUID[...]{Name}` → `Name`, `@UUID[...]` without a label →
    the document's name when it can be resolved from the payload, else dropped), image/video/pdf pages as a title

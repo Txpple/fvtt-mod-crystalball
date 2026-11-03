@@ -19,10 +19,10 @@ The contract between the window and the Seer, every endpoint, header, event, err
    is active in the world (403 otherwise).
 3. Checks the limits (413, 429).
 4. Builds the **gaze** from the live world payload, filtered by Foundry's ownership rule at OBSERVER, in four
-   layers: the standing instructions and the DM's *Table notes*; the journal pages every player can observe; the
-   party (members, stash, Clue Board record); the pages only this user observes and each character they own as a
-   curated sheet. Each layer is a cached system block, so a party shares the first three. The gaze is never
-   written to disk.
+   layers: the standing instructions of the model's harness (`src/harness/`) and the DM's *Table notes*; the
+   journal pages every player can observe; the party (members, stash, Clue Board record); the pages only this user
+   observes and each character they own as a curated sheet. Each layer is a cached system block, so a party
+   shares the first three. The gaze is never written to disk.
 5. Gives the model the table's **rulebooks** as two tools when the *Rulebooks* setting names packs the world has
    (`rulebooks.js`): `search_rulebooks` and `read_rulebook`. A pack is read off the ball's socket the first time
    a lookup needs it (a `modifyDocument` get, as Foundry's own client asks) and held six hours; each player

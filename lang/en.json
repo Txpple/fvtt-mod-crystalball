@@ -93,8 +93,19 @@
     "status": {
       "loading": "Gazing…",
       "dark": "Dark",
-      "count": "{n} of {max} today",
-      "countUncapped": "{n} today"
+      "count": "{n} of {max} today"
+    },
+    "export": {
+      "hint": "Export this sitting as a Markdown file",
+      "title": "The Crystal Ball: {name}",
+      "done": "{name} saved: {n} questions.",
+      "doneOne": "{name} saved: 1 question.",
+      "none": "Nothing in this sitting to export yet."
+    },
+    "copy": {
+      "hint": "Copy this answer",
+      "done": "Copied.",
+      "failed": "The browser would not copy it; select the words and copy them instead."
     },
     "newSitting": "New sitting",
     "newSittingHint": "Close this sitting (the DM keeps it) and start a fresh one",

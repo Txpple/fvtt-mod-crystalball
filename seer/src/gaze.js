@@ -2,7 +2,7 @@
  * The gaze: what the ball knows for one user at one moment, built from the live world payload in
  * four layers, always in this order (the contract's *The gaze*):
  *
- *   1. instructions  the standing text and the DM's table notes (the same for everyone)
+ *   1. instructions  the model's harness and the DM's table notes (the same for everyone at a table)
  *   2. lore          every journal page every player can observe (the same for every player)
  *   3. party         the user's party: members, stash, Clue Board record (the same for a party)
  *   4. own           the pages only this user observes, then each character they own
@@ -15,7 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { INSTRUCTIONS_VERSION, instructionsLayer } from "./instructions.js";
+import { harnessFor, instructionsLayer, versionOf } from "./instructions.js";
 import { CURRENCIES } from "./labels.js";
 import { htmlToMarkdown, uuidNamer } from "./markdown.js";
 import {
@@ -410,13 +410,14 @@ const layer = (name, text) => ({ name, text, hash: sha256(text), estTokens: esti
  * @param {string} userId    the asker's Foundry user id
  * @param {ReturnType<import("./settings.js").moduleSettings>} settings
  * @param {{ budgetTokens?: number, warn?: (message: string, fields?: object) => void,
- *   books?: string[] }} [options]  `books`: the table's rulebooks, named in the instructions layer
+ *   books?: string[], model?: string }} [options]  `books`: the table's rulebooks, named in the
+ *   instructions layer; `model`: the configured model id, which picks the harness
  */
 export function buildGaze(
   world,
   userId,
   settings,
-  { budgetTokens = 120000, warn = () => {}, books = [] } = {}
+  { budgetTokens = 120000, warn = () => {}, books = [], model } = {}
 ) {
   const user = (world?.users ?? []).find(u => u._id === userId);
   if (!user) throw new Error("the user is not in the world");
@@ -425,7 +426,7 @@ export function buildGaze(
 
   const instructions = layer(
     "instructions",
-    instructionsLayer(settings?.tableNotes ?? "", { books })
+    instructionsLayer(settings?.tableNotes ?? "", { books, model })
   );
   const { lore, own: ownPages } = journalFor(world, user, { gmGaze, nameOf });
   const group = partyFor(world, user, { gmGaze });
@@ -474,7 +475,7 @@ export function buildGaze(
       clues: party.clues,
       members: party.members,
       trimmed: trimmed.size,
-      instructionsVersion: INSTRUCTIONS_VERSION
+      instructionsVersion: versionOf(harnessFor(model))
     }
   };
 }

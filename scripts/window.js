@@ -7,7 +7,9 @@
  * world is out of reach the ball is dark and says why.
  *
  * What the ball says is drawn by decide/markdown.js over escaped text; what the player typed is
- * escaped by the template. Neither is ever enriched. The window opens nothing of its own, so it
+ * escaped by the template. Neither is ever enriched. The transcript's words can be selected, each
+ * finished answer has a copy button, and Export saves the sitting as a Markdown file, as the
+ * family's other windows export theirs. The window opens nothing of its own, so it
  * carries no host helper: Foundry's own Detach moves it, and nothing follows it.
  */
 
@@ -16,6 +18,7 @@ import { renderMarkdown } from "./decide/markdown.js";
 import { lookupLine } from "./decide/rulebooks.js";
 import { composeSaying } from "./decide/saying.js";
 import { darkReason, failureOf, MESSAGE_LIMIT, modelLabel, serviceCandidates, sessionIdFrom, waitOf } from "./decide/session.js";
+import { questionsIn, sittingFileName, sittingMarkdown } from "./decide/sitting.js";
 import { createSseParser } from "./decide/sse.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -176,7 +179,9 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     actions: {
       send: CrystalBallWindow.#onSend,
       newSitting: CrystalBallWindow.#onNewSitting,
-      retry: CrystalBallWindow.#onRetry
+      retry: CrystalBallWindow.#onRetry,
+      copy: CrystalBallWindow.#onCopy,
+      export: CrystalBallWindow.#onExport
     }
   };
 
@@ -255,7 +260,7 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const context = await super._prepareContext(options);
     const loading = this.#phase === "loading";
     const dark = this.#phase === "dark";
-    const you = game.user.character?.name ?? game.user.name ?? t("turn.you");
+    const you = this.#asker();
     const length = this.#draft.length;
     return Object.assign(context, {
       loading,
@@ -264,8 +269,10 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
       model: this.#model ?? t(dark ? "status.dark" : "status.loading"),
       count: this.#countLine(),
       intro: !loading && !dark && !this.#turns.length ? this.#saying : "",
-      turns: this.#turns.map(turn => ({
+      turns: this.#turns.map((turn, index) => ({
+        index,
         user: turn.role === "user",
+        copyable: turn.role === "ball" && !turn.pending && !!turn.text.trim(),
         who: turn.role === "user" ? you : t("turn.ball"),
         text: turn.role === "user" ? turn.text : "",
         html: turn.role === "ball" ? renderMarkdown(turn.text) : "",
@@ -291,13 +298,20 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.#saying = composeSaying(lists, { name, previous: this.#saying });
   }
 
+  /** Who is asking, as the transcript and the export name them: the character, else the user. */
+  #asker() {
+    return game.user.character?.name ?? game.user.name ?? t("turn.you");
+  }
+
+  /**
+   * The day's count against the player's allowance, shown only while the model has one: a null
+   * day cap (a cheap model's) is no allowance, so there is nothing to count down.
+   */
   #countLine() {
     const day = this.#usage?.user?.day;
     const max = this.#usage?.limits?.perUserDay;
-    if (!Number.isFinite(day)) return "";
-    // A null day cap is no cap (a cheap model): the count alone.
-    if (max === null) return t("status.countUncapped", { n: day });
-    return Number.isFinite(max) ? t("status.count", { n: day, max }) : "";
+    if (!Number.isFinite(day) || !Number.isFinite(max)) return "";
+    return t("status.count", { n: day, max });
   }
 
   #counter(length) {
@@ -397,11 +411,15 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     if (send) send.disabled = !this.#canSend();
   }
 
-  /** The count in the bar, in place (no redraw under the player's typing); drawn once it first exists. */
+  /**
+   * The count in the bar, in place (no redraw under the player's typing); drawn once it first
+   * exists, and gone when the allowance is (the Seer moved to a model with none).
+   */
   async #showCount() {
     const el = this.element?.querySelector(".crystalball-count");
     const line = this.#countLine();
     if (el && line) el.textContent = line;
+    else if (el) el.remove();
     else if (line && this.rendered) await this.render();
   }
 
@@ -625,6 +643,44 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
     }, PAINT_MS);
   }
 
+  /** One finished answer's words, as the ball wrote them (its Markdown), to the clipboard. */
+  async copyTurn(index) {
+    const turn = this.#turns[index];
+    const text = turn?.role === "ball" && !turn.pending ? turn.text.trim() : "";
+    if (!text) return;
+    try {
+      await game.clipboard.copyPlainText(text);
+      ui.notifications.info(t("copy.done"));
+    } catch (err) {
+      log.debug("the browser refused the copy", err);
+      ui.notifications.warn(t("copy.failed"));
+    }
+  }
+
+  /**
+   * The sitting as a Markdown file the browser saves to its downloads (the family's Export): what
+   * the transcript shows, an answer still being written left out. Nothing is written anywhere else.
+   */
+  exportSitting() {
+    const turns = this.#turns.filter(turn => !turn.pending);
+    const n = questionsIn(turns);
+    if (!n) return ui.notifications.warn(t("export.none"));
+    const asker = this.#asker();
+    const now = new Date();
+    const markdown = sittingMarkdown({
+      title: t("export.title", { name: asker }),
+      world: game.world?.title ?? "",
+      saved: now.toLocaleString(game.i18n.lang, { dateStyle: "long", timeStyle: "short" }),
+      you: asker,
+      ball: t("turn.ball"),
+      turns
+    });
+    // The file is named for the local day, as the family's exports are.
+    const name = sittingFileName(asker, now.toLocaleDateString("en-CA"));
+    foundry.utils.saveDataToFile(markdown, "text/markdown", name);
+    ui.notifications.info(t(n === 1 ? "export.doneOne" : "export.done", { name, n }));
+  }
+
   /* -------------------------------------------------- */
   /*  Actions                                            */
   /* -------------------------------------------------- */
@@ -639,5 +695,13 @@ export class CrystalBallWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
   static #onRetry() {
     void this.reload();
+  }
+
+  static #onCopy(_event, target) {
+    void this.copyTurn(Number(target.dataset.turn));
+  }
+
+  static #onExport() {
+    this.exportSitting();
   }
 }

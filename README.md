@@ -18,15 +18,28 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
   window in the middle of the screen, one per client.
 - **A sitting.** The window is a transcript and an input. A player types a question and the ball answers, the
   words arriving as they are written. The conversation is the player's **sitting**; it is kept on the server
-  between visits, and *New sitting* starts a fresh one. The status bar names the model and the player's count
-  against their daily allowance. The DM can read sittings on the box, and the window says so.
+  between visits, and *New sitting* starts a fresh one. The status bar names the model, and the player's count
+  against their daily allowance when the model has one (Haiku, the default, has none, so it shows no count). The
+  DM can read sittings on the box, and the window says so.
+- **Keeping what it said.** The words can be selected and copied, and each answer has a copy button. *Export*
+  (the file icon in the bar, as in Clue Board and Card Catalogue) saves the sitting to the browser's downloads as
+  a Markdown file, `crystalball-<character>-<date>.md`.
 - **What the ball knows.** For each player the Seer builds a **gaze** from the live world, under Foundry's own
   ownership rule: the journal pages every player can observe; the party (its members, its stash, and every clue
   and thread on its Clue Board when Clue Board is installed); then the pages only this player can observe and each
-  character they own, as a curated sheet. The DM's *Table notes* setting is read to the ball first. A GM's gaze is
+  character they own, as a curated sheet. The DM's *Table notes* setting is read with the ball's instructions. A GM's gaze is
   a player's by default, so the DM sees what the players get. **Ownership decides the lore**: a journal entry or
   page players can observe is what the ball knows, so the DM chooses what it reads by setting ownership, as for
   the players themselves.
+- **How it answers.** The ball thinks with the player, from what the table has written. A story answer gives the
+  facts with where they come from, then a short **Glimpses** list: the ball's own reading of what they might mean,
+  worded as possibilities, with someone to ask or somewhere to look. What the players wrote on the Clue Board (a
+  clue's note, where the party stands on a thread) is weighed like a fact and marked as the party's intuition. A
+  rules question is answered exactly, from the books when it can look them up, then with how the rule plays for
+  this character; a build question gets the best options compared and one recommended. It never states as true a
+  name, place, event, motive, number or secret the table has not written. A player can ask for just the facts.
+  Its instructions are written for the model it runs on (`seer/src/harness/`: Haiku's own; a general one, not yet
+  tuned, for any other).
 - **The rulebooks.** The ball can look up classes, subclasses and their features, species, backgrounds, feats,
   spells and the class spell lists, equipment and the rules chapters in the compendium packs the DM names in the
   *Rulebooks* setting (by default the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn, when the world
@@ -69,7 +82,7 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | --- | --- | --- |
 | Enabled | on | Off hides the button and the Seer answers no one. |
 | Service URL | `/crystalball` | Where the window calls the Seer. The default is a path on Foundry's own origin, which a hosted world's tunnel or proxy rule routes to the Seer. On a plain-http page with that default (a sandbox, with no proxy) the window also tries the same path on port 30001 of the host it reached Foundry by, the Seer's own port, so a sandbox needs no setting, from the machine itself or from another device on the network; an https page asks its own origin alone. A full URL, on Foundry's origin or elsewhere, is asked alone. |
-| Table notes | empty | The DM's standing notes to the ball: its manner, what to decline, house facts. Read before anything else. |
+| Table notes | empty | The DM's standing notes to the ball: its manner, what to decline, house facts. Read after its own instructions, and they win over them on manner (glimpses, length, voice), never on stating an invented fact as true. |
 | Who may ask | every player | Every user, or only the listed user ids. |
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |
 | The GM's gaze | a player's | What a GM's sitting knows: what every player sees plus the GM's own pages, or everything in the world. |

@@ -9,6 +9,9 @@
         <i class="fa-solid fa-rotate-right" inert></i> {{ localize "fvtt-mod-crystalball.retry" }}
     </button>
     {{/if}}
+    <button type="button" class="crystalball-btn crystalball-icon" data-action="export" data-tooltip="{{ localize "fvtt-mod-crystalball.export.hint" }}" aria-label="{{ localize "fvtt-mod-crystalball.export.hint" }}">
+        <i class="fa-solid fa-file-export" inert></i>
+    </button>
     <button type="button" class="crystalball-btn" data-action="newSitting" data-tooltip="{{ localize "fvtt-mod-crystalball.newSittingHint" }}" {{#if newOff}}disabled{{/if}}>
         <i class="fa-solid fa-sparkles" inert></i> {{ localize "fvtt-mod-crystalball.newSitting" }}
     </button>
@@ -20,7 +23,12 @@
     {{/if}}
     {{#each turns}}
     <article class="crystalball-turn {{#if user}}user{{else}}ball{{/if}}{{#if pending}} pending{{/if}}">
-        <span class="crystalball-who">{{ who }}</span>
+        <div class="crystalball-turn-head">
+            <span class="crystalball-who">{{ who }}</span>
+            {{#if copyable}}
+            <button type="button" class="crystalball-copy" data-action="copy" data-turn="{{ index }}" data-tooltip="{{ localize "fvtt-mod-crystalball.copy.hint" }}" aria-label="{{ localize "fvtt-mod-crystalball.copy.hint" }}"><i class="fa-regular fa-copy" inert></i></button>
+            {{/if}}
+        </div>
         {{#if user}}
         <div class="crystalball-text">{{ text }}</div>
         {{else}}

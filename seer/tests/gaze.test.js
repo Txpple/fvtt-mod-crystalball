@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildGaze, estimateTokens, LAYER_NAMES, sortEntries } from "../src/gaze.js";
-import { INSTRUCTIONS } from "../src/instructions.js";
+import { harnessFor } from "../src/instructions.js";
+
+/** The standing text a gaze built with no model reads: the general harness. */
+const INSTRUCTIONS = harnessFor().standing;
 import { moduleSettings } from "../src/settings.js";
 import { world } from "./helpers.js";
 

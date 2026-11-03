@@ -252,7 +252,8 @@ export function createServer({
       const gaze = buildGaze(world, user._id, settings, {
         budgetTokens: config.limits.gazeBudgetTokens,
         warn: (m, f) => log.warn(m, f),
-        books: desk?.books ?? []
+        books: desk?.books ?? [],
+        model: model.id
       });
       const sitting = sittings.current(user._id, { model: model.id });
       const messages = [

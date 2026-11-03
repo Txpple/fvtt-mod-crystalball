@@ -96,7 +96,7 @@
 }
 
 /* -------------------------------------------------- */
-/*  The bar: the model, the count, New sitting         */
+/*  The bar: the model, the count, Export, New sitting */
 /* -------------------------------------------------- */
 
 .crystalball-bar {
@@ -160,11 +160,21 @@
   flex: 1;
 }
 
+/* Export: an icon alone, as the family's export buttons are, at New sitting's height. */
+.crystalball-btn.crystalball-icon {
+  padding: 0.2rem 0.5rem;
+  color: var(--cb-ink-2);
+}
+
 /* -------------------------------------------------- */
 /*  The transcript                                     */
 /* -------------------------------------------------- */
 
+/* The words can be selected and copied: Foundry turns selection off across its interface. */
 .crystalball-transcript {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -211,6 +221,49 @@
   background:
     linear-gradient(180deg, rgba(29, 42, 74, 0.45), rgba(29, 42, 74, 0.15)), var(--cb-card);
   border-color: #3a4560;
+}
+
+.crystalball-turn-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* An answer's copy button: quiet until the answer is pointed at or the button has the focus. */
+.crystalball-copy {
+  flex: none;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0.1rem 0.3rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--cb-ink-3);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0.45;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.crystalball-turn:hover .crystalball-copy,
+.crystalball-copy:focus-visible {
+  opacity: 1;
+}
+
+.crystalball-copy:hover {
+  border-color: #8a7a55;
+  color: var(--cb-ink);
+}
+
+.crystalball-copy:focus-visible {
+  outline: 2px solid var(--cb-gold);
+  outline-offset: 1px;
 }
 
 .crystalball-who {

@@ -15,8 +15,10 @@
 // the Seer's BASE_PATH included; the Service URL setting is pointed there for the run, or left at
 // the contract's default with --default-url, so the window finds the Seer on the companion port
 // as a sandbox's does), sends a question with Enter, waits for the ball's answer to finish, checks
-// the stub's sentence when the Seer runs its stub model, that its count moved by one, and that New
-// sitting empties the transcript. The temp user, its ownership and the setting go in `finally`.
+// the stub's sentence when the Seer runs its stub model, that usage/me moved by one and the bar shows
+// a count only while the model has an allowance, that the answer can be selected and its copy button
+// copies the ball's words, that Export saves the sitting as Markdown, and that New sitting empties
+// the transcript. The temp user, its ownership and the setting go in `finally`.
 // --question asks something else; --expect-lookup asserts the window showed the rulebook lookup
 // line under the pending turn (a rules question on a real model).
 import { Foundry, foundryConfig, loadEnv } from "fvtt-mcp-dnd5e/client";
@@ -357,10 +359,62 @@ try {
         const answerHtml = finished?.querySelector(".crystalball-text")?.innerHTML ?? "";
         const error = finished?.querySelector(".crystalball-error")?.textContent?.trim() ?? null;
         const userTurn = [...win.element.querySelectorAll(".crystalball-turn.user .crystalball-text")].pop()?.textContent ?? null;
-        await until(() => win.element?.querySelector(".crystalball-count")?.textContent?.trim() !== countBefore, 5_000);
-        const countAfter = win.element?.querySelector(".crystalball-count")?.textContent?.trim() ?? null;
         const usageAfter = await usageNow();
+        // A count only while the model has an allowance: then it moves, else there is none to show.
+        const capped = Number.isFinite(usageAfter?.limits?.perUserDay);
+        if (capped) await until(() => win.element?.querySelector(".crystalball-count")?.textContent?.trim() !== countBefore, 5_000);
+        const countAfter = win.element?.querySelector(".crystalball-count")?.textContent?.trim() ?? null;
         const draftCleared = win.element?.querySelector("textarea[name=message]")?.value === "";
+
+        // The words can be selected; the finished answer's copy button copies the ball's own words.
+        const last = balls().pop();
+        const selectable = last ? getComputedStyle(last.querySelector(".crystalball-text")).userSelect : null;
+        const sittingNow = await fetch(`${base}/sittings/current`, { headers: { "X-Foundry-Session": session } })
+          .then(r => r.json())
+          .catch(() => null);
+        const ballWords = [...(sittingNow?.turns ?? [])].reverse().find(turn => turn.role === "ball")?.text ?? null;
+        let copied = null;
+        const clip = game.clipboard.copyPlainText;
+        game.clipboard.copyPlainText = async text => {
+          copied = text;
+        };
+        try {
+          last?.querySelector('[data-action="copy"]')?.click();
+          await until(() => copied !== null, 3_000);
+        } finally {
+          game.clipboard.copyPlainText = clip;
+        }
+
+        // Export: the file the browser would save, caught at its download link (foundry.utils is a
+        // module namespace, so its saveDataToFile cannot be swapped). The blob is read at once, before
+        // Foundry revokes its URL.
+        let caught = null;
+        const anchor = HTMLAnchorElement.prototype;
+        const own = { click: Object.hasOwn(anchor, "click"), dispatchEvent: Object.hasOwn(anchor, "dispatchEvent") };
+        const { click, dispatchEvent } = anchor;
+        const take = a => {
+          if (!a.download) return false;
+          caught = { filename: a.download, blob: fetch(a.href).then(r => r.blob()) };
+          return true;
+        };
+        anchor.click = function () {
+          if (!take(this)) return click.call(this);
+        };
+        anchor.dispatchEvent = function (event) {
+          return event?.type === "click" && take(this) ? true : dispatchEvent.call(this, event);
+        };
+        let saved = null;
+        try {
+          win.element.querySelector('[data-action="export"]')?.click();
+          await until(() => caught, 3_000);
+          const blob = await caught?.blob;
+          saved = caught ? { filename: caught.filename, type: blob?.type ?? null, data: (await blob?.text()) ?? null } : null;
+        } finally {
+          if (own.click) anchor.click = click;
+          else delete anchor.click;
+          if (own.dispatchEvent) anchor.dispatchEvent = dispatchEvent;
+          else delete anchor.dispatchEvent;
+        }
 
         // New sitting: the transcript empties and the first line shows again.
         win.element.querySelector('[data-action="newSitting"]')?.click();
@@ -389,7 +443,13 @@ try {
           userTurn,
           usageBefore,
           usageAfter,
+          capped,
           draftCleared,
+          selectable,
+          ballWords,
+          copied,
+          saved,
+          asker: game.user.character?.name ?? game.user.name,
           looked,
           emptied: !!emptied,
           currentTurns: Array.isArray(current?.turns) ? current.turns.length : null
@@ -432,7 +492,15 @@ ${C.answer.replace(/^/gm, "    ")}`);
       }
       const before = C.usageBefore?.user?.day;
       const after = C.usageAfter?.user?.day;
-      assert(Number.isFinite(before) && after === before + 1, `usage/me moved by one (${before} → ${after}); the bar: "${C.countBefore}" → "${C.countAfter}"`);
+      assert(Number.isFinite(before) && after === before + 1, `usage/me moved by one (${before} → ${after})`);
+      if (C.capped) assert(!!C.countAfter && C.countAfter !== C.countBefore, `the bar's count moved ("${C.countBefore}" → "${C.countAfter}")`);
+      else assert(C.countBefore === null && C.countAfter === null, `no count in the bar: the model has no allowance ("${C.countAfter ?? ""}")`);
+      assert(C.selectable === "text", `the answer's words can be selected (user-select: ${C.selectable})`);
+      assert(!!C.copied && C.copied === C.ballWords?.trim(), `the copy button copied the ball's words (${C.copied?.length ?? 0} characters)`);
+      const day = new Date().toLocaleDateString("en-CA");
+      const slug = C.asker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      assert(C.saved?.filename === `crystalball-${slug}-${day}.md` && C.saved?.type === "text/markdown", `Export saved ${C.saved?.filename ?? "nothing"} (${C.saved?.type ?? "-"})`);
+      assert(!!C.saved?.data?.includes(`## ${C.asker}\n\n${QUESTION}`) && C.saved.data.includes("## The Crystal Ball"), "the export holds the question and the ball's answer under their speakers");
       assert(C.emptied, "New sitting emptied the transcript and showed the first line again");
       assert(C.currentTurns === 0, `the Seer's open sitting is empty after New sitting (${C.currentTurns} turns)`);
     }
