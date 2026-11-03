@@ -24,7 +24,7 @@ describe("the harness a model reads", () => {
   });
 
   it("carries its own version", () => {
-    expect(versionOf(HAIKU)).toBe("haiku-4");
+    expect(versionOf(HAIKU)).toBe("haiku-5");
     expect(versionOf(GENERAL)).toBe("general-4");
     expect(HARNESSES.map(h => h.name)).toEqual(["haiku", "general"]);
   });
@@ -32,7 +32,7 @@ describe("the harness a model reads", () => {
   it("names the gaze's version in its meta", () => {
     const w = world();
     const gaze = model => buildGaze(w, ADA, moduleSettings(w), { model });
-    expect(gaze("claude-haiku-5-5").meta.instructionsVersion).toBe("haiku-4");
+    expect(gaze("claude-haiku-5-5").meta.instructionsVersion).toBe("haiku-5");
     expect(gaze("claude-sonnet-5-5").meta.instructionsVersion).toBe("general-4");
     expect(gaze("claude-haiku-5-5").layers[0].text.startsWith(HAIKU.standing)).toBe(true);
     expect(gaze(undefined).layers[0].text.startsWith(GENERAL.standing)).toBe(true);
@@ -98,5 +98,10 @@ describe("the instructions layer", () => {
     expect(HAIKU.standing).toContain("Nothing the party has written down says who hired them.");
     expect(HAIKU.standing).toContain("## Questions about the rules and the character's options");
     expect(HAIKU.rulebooks(["B"])).toContain("even when you feel sure");
+    // A source by the record's own label; a session only under its heading.
+    expect(HAIKU.standing).toContain(
+      "Name a session only when you can see the fact under that session's heading"
+    );
+    expect(HAIKU.standing).toContain('otherwise say "the session diary"');
   });
 });

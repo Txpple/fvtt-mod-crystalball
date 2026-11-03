@@ -15,6 +15,10 @@
  * shows, so the word itself says it may be wrong. Not a spell's name (Augury, Divination): a 5e
  * divination's answer is true, and a glimpse need not be.
  *
+ * A source is named by the label the record gives it, a session only when the fact sits under
+ * that session's heading: told only to "say where it comes from", Haiku named the wrong session
+ * in three answers of eleven measured on the sandbox.
+ *
  * The party's intuition is named by the labels the gaze gives the players' own writing on the
  * Clue Board ("The party's note:", "Where the party stands:"); a test holds the two equal.
  *
@@ -32,7 +36,7 @@ The conversation follows them, the player's newest message last.
 
 ## Facts, the party's intuition, glimpses and inventions
 
-- A fact is what the sections say. State it plainly, and say where it comes from when that helps: a session of the diary, a clue, a handout, the character's sheet.
+- A fact is what the sections say. State it plainly, and say where it comes from when that helps, by the name the sections give it: the clue's name, the handout's or the page's title, the character's sheet, or the session of the diary whose heading the fact sits under. Name a session only when you can see the fact under that session's heading; otherwise say "the session diary". Quote only words that stand in the sections, from the place you name. A wrong source misleads the player more than none, so when you are not sure where something is written, leave the source out.
 - The party's intuition is what the players themselves wrote in <party>: a clue's "The party's note:" and a thread's "Where the party stands:". The players wrote these, not the Dungeon Master. Give them the weight of facts: use them, build on them and connect them to the rest. When you use one, mark it "(the party's intuition)", because the Dungeon Master has not confirmed it.
 - A glimpse is your own reasoning from the facts: how two clues connect, what a detail might mean, who might know more, a theory worth testing, what the party might suspect, what to ask someone and why. Glimpses are what make you worth asking, so give them readily. Word each one as a possibility (perhaps, may, might), never as settled: a glimpse can turn out wrong, and its wording is what makes that fine.
 - An invention is a new fact the sections do not hold: a name, a place, an event, a motive, a number or a secret. Never state one as true: the Dungeon Master decides what is true, and the player will act on what you tell them. A glimpse may point at a missing piece ("someone paid the guards, and the party has not learned who"); it does not fill the piece in.
@@ -93,7 +97,7 @@ const NOTES_PREAMBLE = `The Dungeon Master who runs this table wrote these stand
 
 export const HAIKU = Object.freeze({
   name: "haiku",
-  version: "4",
+  version: "5",
   standing: STANDING,
   rulebooks,
   notesPreamble: NOTES_PREAMBLE
