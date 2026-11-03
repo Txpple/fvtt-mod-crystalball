@@ -78,8 +78,8 @@ Checked: `healthz` on 127.0.0.1, ::1, the Wi-Fi and the Tailscale address; a pre
 manifest 1.0.4 after that restart; `tools/live-check.mjs --walk --default-url` GREEN on the real model, the GM page's
 window lit by the companion port and Kartor's answer in 5 s. Release and prod wait for the user's word. Known: the
 MCP's restart and mirror guards count the ball's user among connected users (prod's `/api/status` reads 1 with the
-box's Seer up), so the local restart needed `--force` and a mirror from prod will refuse until the MCP's guards
-discount it.
+box's Seer up), so the local restart needed `--force`; the MCP's guards discount it since the same evening (its
+`scripts/lib/seer.mjs`, unreleased on its `main`).
 
 ## The rules this module keeps
 
