@@ -8,7 +8,7 @@ world under Foundry's ownership rule, and streams the model's answer). Part of O
 `..`, its CLAUDE.md has the family's conventions; the plan this is built from is `../docs/plans/crystalball.md`).
 Plain ES modules, no build step, no libWrapper, no socketlib, MIT.
 
-**State (2026-11-02).** 0.1.0 built overnight on the sandbox and reviewed (the two halves to
+**State (2026-11-03).** 0.1.0 built overnight on the sandbox and reviewed (the two halves to
 `docs/seer-contract.md`, three reviews applied, `npm run verify` green, 314 tests, `tools/live-check.mjs --walk`
 GREEN in stub mode), then run on the real model the same morning: the user's key in the gitignored `seer/.env` (a
 Console workspace of its own with a $25 monthly limit; the Console has no day cap, the Seer's own is the one),
@@ -131,7 +131,17 @@ PASS on prod with no player connected, 18/18 served files byte-identical with th
 the guide's Updating over SSH (no `CONFIG` there, so the committed defaults: Haiku at high), "foundry: connected"
 at once, `healthz` 1.0.6 on Haiku and a forged id 401 through the public hostname. Then, on the user's word ("once
 done, copy prod to sandbox"), prod mirrored to the sandbox over SSH; the sandbox's Crystal Ball byte-identical with
-`v1.0.6`, its Seer up at 1.0.6 beside Foundry.
+`v1.0.6`, its Seer up at 1.0.6 beside Foundry. **1.0.7 released and on prod: a harness per model, copy and
+Export** (the user found Haiku "very literal": no hints, no guesses; the harness proposed before it was built, then
+"Build it as proposed"). Version 3's "never guess" beside "make suggestions when they would help" and "be short"
+left Haiku reading entries back. Now Haiku's own harness (the rules below) and the general one for any other model;
+measured through Kartor's real gaze, nine sittings each way on Haiku high ($0.08): Glimpses in every story answer,
+the party's notes marked as its intuition, the books looked up, a build recommended, "just the facts" held, two
+slips of Haiku's own. The window: selectable words, a copy button per answer, Export to
+`crystalball-<character>-<date>.md`, a count only under an allowance; the walk checks them. `verify` green (402
+tests); deployed `--local`, the walk GREEN on Haiku; released through the reusable workflow, the installer PASS on prod
+with no player connected, 19/19 served files byte-identical with the zip; the box's Seer at `v1.0.7`, `healthz` 1.0.7
+on Haiku and a forged id 401 through the public hostname. Both worlds' *Table notes* are empty.
 
 ## The rules this module keeps
 
@@ -169,6 +179,14 @@ done, copy prod to sandbox"), prod mirrored to the sandbox over SSH; the sandbox
   (instructions and the DM's table notes; the lore every player can observe; the party with its stash and Clue
   Board record; the player's own pages and curated sheets), the permission rule mirroring `testUserPermission` at
   OBSERVER, each layer a cached system block so a party shares the first three. The gaze is never written to disk.
+- **The instructions are a harness per model** (`seer/src/harness/`, picked by the model id in `instructions.js`,
+  each versioned `<name>-<version>`; a wording change is a new version): Haiku's, tuned on this world, and the
+  general one for any other model, untuned until the ball runs on it. Every harness keeps the contract's three
+  rules: what is written is fact with its source (the players' own clue notes and thread stands weighed as fact,
+  marked "(the party's intuition)"); the ball's own reading is welcome, a **Glimpse** worded as a possibility (never
+  a spell's name: a 5e divination's answer is true); nothing unwritten is stated as true. The DM's *Table notes* win
+  on manner, never on the third rule. A harness change is proposed to the user as text before it is built, and
+  measured on the sandbox through a real gaze, old text against new.
 - **The rulebooks are looked up, never put in the gaze** (`seer/src/rulebooks.js`): the packs the *Rulebooks*
   setting names (journal and item packs only, never a bestiary; an embedded stat block dropped; what else stays
   out by name in *Left out of the rulebooks*, a line led by `<book id>: ` counting for that book alone, since
@@ -203,7 +221,8 @@ done, copy prod to sandbox"), prod mirrored to the sandbox over SSH; the sandbox
 - `scripts/window.js`: `CrystalBallWindow` (ApplicationV2 + Handlebars, one per client): the status bar, the
   transcript, the input, the stream.
 - `scripts/decide/`: `sse.js` (the stream parser), `markdown.js` (the safe subset), `saying.js` (the opening
-  saying from lang/en.json's lists), `rulebooks.js` (the rulebook settings' defaults, the lookup line), `session.js` (the session id,
+  saying from lang/en.json's lists), `rulebooks.js` (the rulebook settings' defaults, the lookup line), `sitting.js`
+  (the Export's Markdown and file name), `session.js` (the session id,
   the base URL, `modelLabel`, `failureOf`, `waitOf`, `darkReason`); pure, `// @ts-check`, tested in `tests/`.
 - `scripts/common.js`, `scripts/kit/`.
 - `seer/src/`: `main.js` (the entry: the Node 24 check, the process-level handlers, always runs), `config.js`
@@ -211,7 +230,8 @@ done, copy prod to sandbox"), prod mirrored to the sandbox over SSH; the sandbox
   `start.js`, `foundry.js` (join, the ball's socket, the probe, the world, a pack's documents), `settings.js`
   (the module's world settings off the payload, user-scoped rows ignored, the module's active check),
   `permission.js`, `gaze.js`, `rulebooks.js` (the packs, their permission, the search, the reads, the library), `markdown.js` (the enrichers and turndown), `labels.js` (dnd5e's key-to-label maps), `sheet.js`,
-  `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (versioned), `log.js`;
+  `model.js`, `limits.js`, `ledger.js`, `sittings.js`, `http.js`, `instructions.js` (the harness picked by model),
+  `harness/` (`haiku.js`, `general.js`, each versioned), `log.js`;
   `seer/config.json` the defaults; `seer/tests/` with synthetic fixtures under `fixtures/<foundry version>/`;
   `seer/deploy/` the systemd unit and the Linux guide; `seer/README.md`.
 - `tools/live-check.mjs`: the sandbox walk (`FOUNDRY_HOST=local`, `--walk`, `--seer <url>`, `--default-url` for
