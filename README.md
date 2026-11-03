@@ -27,8 +27,8 @@ and the Seer is [`docs/seer-contract.md`](docs/seer-contract.md); the Seer's own
 - **What the ball knows.** For each player the Seer builds a **gaze** from the live world, under Foundry's own
   ownership rule: the journal pages every player can observe; the party (its members, its stash, and every clue
   and thread on its Clue Board when Clue Board is installed); then the pages only this player can observe and each
-  character they own, as a curated sheet. The DM's *Table notes* setting is read with the ball's instructions. A GM's gaze is
-  a player's by default, so the DM sees what the players get. **Ownership decides the lore**: a journal entry or
+  character they own, as a curated sheet. The DM's *Table notes* setting is read with the ball's instructions. A GM
+  sees what the players see, plus what is granted to them by name, so the DM tests what the players get. **Ownership decides the lore**: a journal entry or
   page players can observe is what the ball knows, so the DM chooses what it reads by setting ownership, as for
   the players themselves.
 - **How it answers.** The ball thinks with the player, from what the table has written. A story answer gives the
@@ -85,7 +85,6 @@ makes in User Management; the Seer logs in as it. Clue Board is read when presen
 | Table notes | empty | The DM's standing notes to the ball: its manner, what to decline, house facts. Read after its own instructions, and they win over them on manner (glimpses, length, voice), never on stating an invented fact as true. |
 | Who may ask | every player | Every user, or only the listed user ids. |
 | Listed askers | empty | Comma-separated user ids, when *Who may ask* is *listed*. |
-| The GM's gaze | a player's | What a GM's sitting knows: what every player sees plus the GM's own pages, or everything in the world. |
 | Rulebooks | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn packs | The compendium packs the ball may look rules up in, one pack id a line. Journal and item packs only; empty, it looks nothing up. |
 | Left out of the rulebooks | the Handbook's creature stat blocks; Arcana Unleashed's Chapter 3 (creating magical worlds), Chapter 5 (magic items), Chapter 6 (creatures) and Appendix (its adventure); credits, change logs | Folders, journal entries and pages it never reads in those packs, one name a line; `<book id>: <name>` leaves a name out of that book alone (`dnd-arcana-unleashed: Chapter 5`). |
 

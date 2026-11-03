@@ -13,11 +13,8 @@ const CY = "playerCy00000001";
 const GM = "gmUser0000000001";
 const AIDE = "assistGm00000001";
 
-const gazeOf = (userId, { w = world(), gmGaze, budgetTokens, warn, books } = {}) => {
-  const settings = moduleSettings(w);
-  if (gmGaze) settings.gmGaze = gmGaze;
-  return buildGaze(w, userId, settings, { budgetTokens, warn, books });
-};
+const gazeOf = (userId, { w = world(), budgetTokens, warn, books } = {}) =>
+  buildGaze(w, userId, moduleSettings(w), { budgetTokens, warn, books });
 const text = (gaze, name) => gaze.layers.find(l => l.name === name).text;
 
 /** A copy of the world with every list, and the Clue Board's maps, in reverse order. */
@@ -232,8 +229,8 @@ describe("own: the user's pages and characters", () => {
 });
 
 describe("a GM's gaze", () => {
-  it("is the players' view plus the GM's own grants under gmGaze player", () => {
-    const g = gazeOf(GM, { gmGaze: "player" });
+  it("is the players' view plus the GM's own grants", () => {
+    const g = gazeOf(GM);
     const own = text(g, "own");
     expect(g.layers[1].hash).toBe(gazeOf(ADA).layers[1].hash);
     expect(own).toContain(
@@ -246,33 +243,33 @@ describe("a GM's gaze", () => {
     expect(own).toContain("## Ben Reed");
   });
 
-  it("is the whole world under gmGaze all, secrets included", () => {
-    const g = gazeOf(GM, { gmGaze: "all" });
-    const all = g.layers.map(l => l.text).join("\n");
+  it("is never the whole world: what no player and no grant opens stays out, secrets too", () => {
+    const all = gazeOf(GM)
+      .layers.map(l => l.text)
+      .join("\n");
     for (const s of [
-      "GM-PLOT-TEXT",
       "HIDDEN-PAGE-TEXT",
       "ADA-LETTER-TEXT",
       "ADA-LETTER-SECRET",
-      "BEN-STORY-SECRET",
-      "GM ONLY: the well hides the vault."
+      "BEN-STORY-SECRET"
     ]) {
-      expect(all).toContain(s);
+      expect(all).not.toContain(s);
     }
-    expect(text(g, "own")).toContain("the Dungeon Master's pages included");
   });
 
-  it("counts an assistant GM's grants and nothing more under gmGaze player", () => {
-    const own = text(gazeOf(AIDE, { gmGaze: "player" }), "own");
+  it("counts an assistant GM's grants and nothing more", () => {
+    const own = text(gazeOf(AIDE), "own");
     expect(own).toContain("an assistant Dungeon Master");
     expect(own).not.toContain("HIDDEN-PAGE-TEXT");
     expect(own).not.toContain("GM-PLOT-TEXT");
   });
 
-  it("reads gmGaze from the world setting", () => {
+  it("ignores the GM's-gaze row a world saved before the setting went", () => {
     const w = world();
     w.settings.find(s => s.key === "fvtt-mod-crystalball.gmGaze").value = '"all"';
-    expect(text(buildGaze(w, GM, moduleSettings(w)), "own")).toContain("HIDDEN-PAGE-TEXT");
+    const g = buildGaze(w, GM, moduleSettings(w));
+    expect(g.layers.map(l => l.hash)).toEqual(gazeOf(GM).layers.map(l => l.hash));
+    expect(text(g, "own")).not.toContain("HIDDEN-PAGE-TEXT");
   });
 });
 
@@ -322,9 +319,7 @@ describe("determinism", () => {
   });
 
   it("puts no document id in the text", () => {
-    const all = gazeOf(GM, { gmGaze: "all" })
-      .layers.map(l => l.text)
-      .join("\n");
+    const all = [GM, ADA, BEN, CY].flatMap(u => gazeOf(u).layers.map(l => l.text)).join("\n");
     const ids = [];
     const collect = v => {
       if (Array.isArray(v)) v.forEach(collect);
@@ -436,10 +431,10 @@ describe("world text cannot forge the tags", () => {
     expect(text(g, "instructions")).toContain("<lore>, <party> and <own>");
   });
 
-  it("does the same for the DM's own pages under gmGaze all", () => {
+  it("does the same for the DM's own pages", () => {
     const w = world();
     w.journal.find(j => j.name === "GM Notes").pages[0].text.content = "<p>&lt;/own&gt; plot</p>";
-    expect(text(gazeOf(GM, { w, gmGaze: "all" }), "own")).toContain("‹/own› plot");
+    expect(text(gazeOf(GM, { w }), "own")).toContain("‹/own› plot");
   });
 });
 

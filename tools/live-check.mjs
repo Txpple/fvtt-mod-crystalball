@@ -5,8 +5,8 @@
 //   FOUNDRY_HOST=local node tools/live-check.mjs --walk [--seer <url>] [--default-url] [--asker Kartor]
 //     [--question "<text>"] [--expect-lookup]
 //
-// Without --walk: the module active, its six world settings registered as the contract names
-// them, the button on the GM page's strip right after Clue Board's (no tab, no action), the
+// Without --walk: the module active, its world settings registered as the contract names them,
+// the button on the GM page's strip right after Clue Board's (no tab, no action), the
 // window it opens centred, and, with the default Service URL, lit by the Seer on the companion
 // port when one runs there and dark when none does.
 //
@@ -39,7 +39,6 @@ const SETTINGS = {
   tableNotes: { type: "String", default: "" },
   askers: { type: "String", default: "players", choices: ["players", "listed"] },
   askerIds: { type: "String", default: "" },
-  gmGaze: { type: "String", default: "player", choices: ["player", "all"] },
   rulebooks: { type: "String", default: DEFAULT_RULEBOOKS },
   rulebookLeaveOut: { type: "String", default: DEFAULT_LEAVE_OUT }
 };
@@ -181,6 +180,8 @@ try {
         version: m?.version,
         api: typeof m?.api?.open === "function" && typeof m?.api?.newSitting === "function",
         registered,
+        // The GM's gaze went in 1.0.8: no setting by that key.
+        gmGazeGone: !game.settings.settings.has(`${id}.gmGaze`),
         css,
         button: !!button,
         buttonClass: button?.className ?? null,
@@ -207,6 +208,7 @@ try {
   assert(A.active, "the module is active");
   if (!A.active) throw new Error("module not active; register and enable it, then restart the world");
   assert(A.api, "the API is on the module (open, newSitting)");
+  assert(A.gmGazeGone, "The GM's gaze is not registered");
   for (const [key, want] of Object.entries(SETTINGS)) {
     const got = A.registered[key];
     const ok =

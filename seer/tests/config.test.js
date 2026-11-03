@@ -200,9 +200,9 @@ describe("the module's settings", () => {
       enabled: true,
       serviceUrl: "/crystalball",
       tableNotes: "",
-      askers: "players",
-      gmGaze: "player"
+      askers: "players"
     });
+    expect(SETTING_DEFAULTS).not.toHaveProperty("gmGaze");
   });
 
   it("parse the stored JSON strings and coerce what they must be", () => {
@@ -219,9 +219,10 @@ describe("the module's settings", () => {
       enabled: false,
       askers: "listed",
       askerIds: ["a", "b", "c"],
-      gmGaze: "player",
       tableNotes: ""
     });
+    // The GM's gaze went in 1.0.8: a world's saved row is read as nothing.
+    expect(s).not.toHaveProperty("gmGaze");
   });
 });
 
@@ -294,9 +295,9 @@ describe("whose settings count", () => {
           _stats: { lastModifiedBy: "playerAda0000001" }
         },
         {
-          key: "fvtt-mod-crystalball.gmGaze",
+          key: "fvtt-mod-crystalball.askerIds",
           user: null,
-          value: '"all"',
+          value: '"x, y"',
           _stats: { lastModifiedBy: "assistGm00000001" }
         },
         {
@@ -310,7 +311,7 @@ describe("whose settings count", () => {
     expect(s).toMatchObject({
       tableNotes: "the DM's",
       askers: "players",
-      gmGaze: "all",
+      askerIds: ["x", "y"],
       enabled: true
     });
   });

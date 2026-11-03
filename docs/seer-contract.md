@@ -105,7 +105,6 @@ Scope `world`, namespace `fvtt-mod-crystalball`, registered by the module, read 
 | `tableNotes` | string | `""` | the DM's standing notes to the ball, appended to the instructions layer |
 | `askers` | `"players"` \| `"listed"` | `"players"` | every user may ask, or only `askerIds` |
 | `askerIds` | string | `""` | comma-separated user ids when `askers` is `listed` |
-| `gmGaze` | `"player"` \| `"all"` | `"player"` | a GM's gaze: what every player sees plus the GM's own pages, or everything |
 | `modelLabel` | string | (unset) | reserved; the window shows what `healthz` reports |
 | `rulebooks` | string | the 2024 Player's Handbook, Arcana Unleashed and Heroes of Faerûn's player packs (`scripts/decide/rulebooks.js`) | the compendium packs the ball may look things up in, one pack id a line (commas too); empty: no lookups |
 | `rulebookLeaveOut` | string | the Handbook's stat-block appendix; Arcana Unleashed's Chapters 3, 5 and 6 and Appendix (worldbuilding, magic items, creatures, adventure); credits, change logs | folders, journal entries and pages never read in those packs, one name a line, matched without case or accents; a line led by a package or pack id the world has and a colon (`dnd-arcana-unleashed: Chapter 5`) applies to that book alone |
@@ -143,9 +142,11 @@ Built per user from the live `world` payload, in this order, deterministically (
    descriptions, features with descriptions, inventory (qty, equipped, attuned, description), effects.
 5. **sitting**: the last 24 turns, the new message last.
 
-Permission rule, mirrored from Foundry's `testUserPermission` at OBSERVER: a user with role ≥ 3 (Assistant GM)
-sees everything (subject to `gmGaze`); otherwise the level is `ownership[userId] ?? ownership.default`, and `≥ 2`
-passes. A user with no character gets layers 1 and 2 and whatever of 3 and 4 applies (none, usually).
+Permission rule, mirrored from Foundry's `testUserPermission` at OBSERVER: the level is `ownership[userId] ??
+ownership.default`, and `≥ 2` passes. Foundry passes a user with role ≥ 3 (Assistant GM) everything; the ball does
+not: it is the players' tool, so a GM reads what every player reads plus what is granted to them by name, and the
+DM tests what the players get. (A setting that opened the whole world to a GM, `gmGaze`, went in 1.0.8: the DM's own
+knowledge lives outside the world, and the DM's assistant is the MCP. A world that saved it keeps an ignored row.) A user with no character gets layers 1 and 2 and whatever of 3 and 4 applies (none, usually).
 
 Layers 1–4 are the system prompt, four text blocks: a `cache_control: { type: "ephemeral" }` marker on the
 first three and top-level automatic caching for the rest. The markers carry two TTLs. `config.stableCacheTtl`
@@ -179,8 +180,7 @@ its package or pack (books share folder names: the Handbook and Arcana Unleashed
 **Whose view**: Foundry 14.369 checks no read permission on a compendium get, so the Seer applies it: a pack's
 level for a user is the highest level of any role they hold in `core.compendiumConfiguration[<pack>].ownership`
 (a GM's row only), else the pack's own `ownership`, else `{ PLAYER: "OBSERVER", ASSISTANT: "OWNER" }`, as
-`getUserLevel` computes it; Observer reads. A GM reads at the Player role under `gmGaze` `player` and every
-configured pack under `all`. An embedded page's pack must pass the same test.
+`getUserLevel` computes it; Observer reads. A GM reads at the Player role. An embedded page's pack must pass the same test.
 
 **Loading**: a pack is read the first time a lookup needs it and held six hours (a world change or a pack whose
 index grows reads it again); a pack that fails is said in the search's answer and tried again on the next lookup.

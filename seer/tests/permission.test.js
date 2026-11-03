@@ -80,35 +80,25 @@ describe("canObserve", () => {
     expect(canObserve(hidden, trusted)).toBe(false);
   });
 
-  it("lets a GM see everything under gmGaze all", () => {
+  it("gives a GM the players' view plus their own grants, never Foundry's pass on everything", () => {
     for (const u of [gm, assistant]) {
-      expect(canObserve(hidden, u, { gmGaze: "all" })).toBe(true);
-      expect(canObserve(grantedA, u, { gmGaze: "all" })).toBe(true);
+      expect(canObserve(shared, u)).toBe(true);
+      expect(canObserve(hidden, u)).toBe(false);
+      expect(canObserve(grantedA, u)).toBe(false);
     }
+    expect(canObserve(gmGranted, gm)).toBe(true);
+    expect(canObserve(gmGranted, assistant)).toBe(false);
   });
 
-  it("narrows a GM to the players' view plus their own grants under gmGaze player", () => {
-    expect(canObserve(shared, gm, { gmGaze: "player" })).toBe(true);
-    expect(canObserve(hidden, gm, { gmGaze: "player" })).toBe(false);
-    expect(canObserve(grantedA, gm, { gmGaze: "player" })).toBe(false);
-    expect(canObserve(gmGranted, gm, { gmGaze: "player" })).toBe(true);
-    expect(canObserve(gmGranted, assistant, { gmGaze: "player" })).toBe(false);
+  it("ignores an option that once opened the world to a GM", () => {
+    expect(canObserve(hidden, gm, { gmGaze: "all" })).toBe(false);
   });
 
-  it("defaults to the player's view for a GM", () => {
-    expect(canObserve(hidden, gm)).toBe(false);
-  });
-
-  it("follows an inheriting page for a GM under gmGaze player", () => {
+  it("follows an inheriting page for a GM", () => {
     const entry = { ownership: { default: 0, gm: 3 } };
+    expect(canObserve({ ownership: { default: -1 } }, gm, { parent: entry })).toBe(true);
     expect(
-      canObserve({ ownership: { default: -1 } }, gm, { gmGaze: "player", parent: entry })
-    ).toBe(true);
-    expect(
-      canObserve({ ownership: { default: -1 } }, gm, {
-        gmGaze: "player",
-        parent: { ownership: { default: 0 } }
-      })
+      canObserve({ ownership: { default: -1 } }, gm, { parent: { ownership: { default: 0 } } })
     ).toBe(false);
   });
 
@@ -145,11 +135,12 @@ describe("the helpers", () => {
     expect(ownsExplicitly({ ownership: { default: 0, playerA: 2 } }, "playerA")).toBe(false);
   });
 
-  it("shows secrets to owners, and to a GM with the whole world in view", () => {
+  it("shows secrets to owners only, a GM by their own grant", () => {
     const doc = { ownership: { default: 2, playerA: 3 } };
     expect(seesSecrets(doc, player)).toBe(true);
     expect(seesSecrets(doc, other)).toBe(false);
     expect(seesSecrets(doc, gm)).toBe(false);
-    expect(seesSecrets(doc, gm, { gmGaze: "all" })).toBe(true);
+    expect(seesSecrets(doc, gm, { gmGaze: "all" })).toBe(false);
+    expect(seesSecrets({ ownership: { default: 2, gm: 3 } }, gm)).toBe(true);
   });
 });

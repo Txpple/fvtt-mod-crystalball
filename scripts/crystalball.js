@@ -84,18 +84,6 @@ Hooks.once("init", () => {
     default: ""
   });
 
-  game.settings.register(MODULE_ID, "gmGaze", {
-    ...key("gmGaze"),
-    scope: "world",
-    config: true,
-    type: String,
-    choices: {
-      player: `${MODULE_ID}.settings.gmGaze.player`,
-      all: `${MODULE_ID}.settings.gmGaze.all`
-    },
-    default: "player"
-  });
-
   // The packs the ball may look rules up in, one id a line, and what it never reads in them.
   for (const [name, initial] of [
     ["rulebooks", DEFAULT_RULEBOOKS],

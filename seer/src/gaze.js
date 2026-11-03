@@ -135,23 +135,22 @@ function pageBody(page, { nameOf, secrets, headingOffset }) {
  * The journal pages a user observes, split into those every player observes (lore) and those
  * the user alone, or a few, observe (own), each grouped by entry in folder order.
  */
-export function journalFor(world, user, { gmGaze = "player", nameOf } = {}) {
+export function journalFor(world, user, { nameOf } = {}) {
   const lore = [];
   const own = [];
-  const allSee = isGM(user) && gmGaze === "all";
   for (const entry of sortEntries(world?.journal ?? [], world?.folders ?? [])) {
-    if (!canObserve(entry, user, { gmGaze })) continue;
+    if (!canObserve(entry, user)) continue;
     const shared = [];
     const mine = [];
     for (const page of [...(entry.pages ?? [])].sort(bySortNameId)) {
-      if (!canObserve(page, user, { gmGaze, parent: entry })) continue;
+      if (!canObserve(page, user, { parent: entry })) continue;
       if (everyoneObserves(entry) && everyoneObserves(page, entry)) {
         // The shared layer must read the same for every player, so its secret blocks show only
         // when every player owns the page; an owner's own view of one is the rare cost of that.
-        const secrets = allSee || defaultLevelOf(page, entry) >= LEVELS.OWNER;
+        const secrets = defaultLevelOf(page, entry) >= LEVELS.OWNER;
         shared.push({ page, body: pageBody(page, { nameOf, secrets, headingOffset: 3 }) });
       } else {
-        const secrets = seesSecrets(page, user, { gmGaze, parent: entry });
+        const secrets = seesSecrets(page, user, { parent: entry });
         mine.push({ page, body: pageBody(page, { nameOf, secrets, headingOffset: 4 }) });
       }
     }
@@ -213,12 +212,12 @@ export const ownedCharacters = (world, user) =>
  * The user's party: the first Group actor (by name) they can observe whose members include a
  * character they own, or null.
  */
-export function partyFor(world, user, { gmGaze = "player" } = {}) {
+export function partyFor(world, user) {
   const owned = new Set(ownedCharacters(world, user).map(a => a._id));
   if (!owned.size) return null;
   return (
     (world?.actors ?? [])
-      .filter(a => a.type === "group" && canObserve(a, user, { gmGaze }))
+      .filter(a => a.type === "group" && canObserve(a, user))
       .filter(g => memberIds(g).some(id => owned.has(id)))
       .sort(
         (a, b) =>
@@ -366,19 +365,17 @@ function partyText(world, group, { nameOf }) {
 /*  The user's own                              */
 /* -------------------------------------------- */
 
-function askerLine(user, gmGaze) {
+function askerLine(user) {
   if (isGM(user)) {
     const who =
       user.role >= ROLES.GAMEMASTER ? "the Dungeon Master" : "an assistant Dungeon Master";
-    return gmGaze === "all"
-      ? `The person asking is ${who}, and the ball shows them the whole world, the Dungeon Master's pages included.`
-      : `The person asking is ${who}; the ball shows them what the players see, plus what is granted to them by name.`;
+    return `The person asking is ${who}; the ball shows them what the players see, plus what is granted to them by name.`;
   }
   return "The person asking is a player.";
 }
 
-function ownText(user, characters, ownPages, { gmGaze, nameOf }) {
-  const out = ["# Yours alone", askerLine(user, gmGaze)];
+function ownText(user, characters, ownPages, { nameOf }) {
+  const out = ["# Yours alone", askerLine(user)];
   out.push(
     characters.length
       ? `They play: ${characters.map(c => c.name).join(", ")}.`
@@ -421,18 +418,17 @@ export function buildGaze(
 ) {
   const user = (world?.users ?? []).find(u => u._id === userId);
   if (!user) throw new Error("the user is not in the world");
-  const gmGaze = settings?.gmGaze === "all" ? "all" : "player";
   const nameOf = uuidNamer(world);
 
   const instructions = layer(
     "instructions",
     instructionsLayer(settings?.tableNotes ?? "", { books, model })
   );
-  const { lore, own: ownPages } = journalFor(world, user, { gmGaze, nameOf });
-  const group = partyFor(world, user, { gmGaze });
+  const { lore, own: ownPages } = journalFor(world, user, { nameOf });
+  const group = partyFor(world, user);
   const party = partyText(world, group, { nameOf });
   const characters = ownedCharacters(world, user);
-  const own = layer("own", ownText(user, characters, ownPages, { gmGaze, nameOf }));
+  const own = layer("own", ownText(user, characters, ownPages, { nameOf }));
   const partyLayer = layer("party", party.text);
 
   // Over budget: the oldest lore gives up its text and keeps its titles, the first entry in

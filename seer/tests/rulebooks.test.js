@@ -373,10 +373,11 @@ describe("a pack's permission", () => {
     expect(packOpenTo(p({ PLAYER: "OBSERVER" }), { role: 0 })).toBe(false);
   });
 
-  it("opens to a GM what the players read, or everything under gmGaze all", () => {
+  it("opens to a GM what the players read, and no more", () => {
     const hidden = p({ PLAYER: "NONE", ASSISTANT: "OWNER" });
-    expect(packOpenTo(hidden, GM, { gmGaze: "player" })).toBe(false);
-    expect(packOpenTo(hidden, GM, { gmGaze: "all" })).toBe(true);
+    expect(packOpenTo(hidden, GM)).toBe(false);
+    expect(packOpenTo(hidden, GM, { gmGaze: "all" })).toBe(false);
+    expect(packOpenTo(p({ PLAYER: "OBSERVER" }), GM)).toBe(true);
   });
 
   it("reads the compendium configuration from a GM's row only", () => {
@@ -423,7 +424,7 @@ describe("the table's rulebooks", () => {
 
   it("give the same tool definitions to every player, whatever packs each may open", () => {
     const a = deskFor(PLAYER).desk;
-    const b = deskFor(GM, { ...SETTINGS, gmGaze: "all" }).desk;
+    const b = deskFor(GM).desk;
     expect(JSON.stringify(a.definitions)).toBe(JSON.stringify(b.definitions));
     expect(a.books).toEqual(["Book One", "Book Two"]);
     expect(a.definitions.map(d => d.name)).toEqual([TOOL_SEARCH, TOOL_READ]);
@@ -529,8 +530,8 @@ describe("the search", () => {
     const { desk } = deskFor();
     expect((await search(desk, "wolves")).content).toMatch(/^Nothing/);
     expect((await search(desk, "hidden fire")).content).toMatch(/^Nothing/);
-    const gm = deskFor(GM, { ...SETTINGS, gmGaze: "all" }).desk;
-    expect((await search(gm, "hidden fire")).content).toContain("Hidden Fire");
+    const gm = deskFor(GM).desk;
+    expect((await search(gm, "hidden fire")).content).toMatch(/^Nothing/);
   });
 
   it("names a feature by the class that grants it, and a subclass by its class", async () => {

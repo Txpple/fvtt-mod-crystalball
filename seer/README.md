@@ -15,7 +15,7 @@ The contract between the window and the Seer, every endpoint, header, event, err
    receives Foundry's `session` event `{ sessionId, userId }`. No user, no answer (401). Foundry keeps a
    browser's session id across a logout and binds it to whoever logs in next, so the Seer asks on every request;
    only a refusal is remembered (30 s, under a hash of the id). The id itself is never logged.
-2. Checks the world's own settings for the module (*Enabled*, *Who may ask*, *The GM's gaze*) and that the module
+2. Checks the world's own settings for the module (*Enabled*, *Who may ask*) and that the module
    is active in the world (403 otherwise).
 3. Checks the limits (413, 429).
 4. Builds the **gaze** from the live world payload, filtered by Foundry's ownership rule at OBSERVER, in four

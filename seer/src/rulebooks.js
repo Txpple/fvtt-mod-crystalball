@@ -11,7 +11,7 @@
  *   pack's ownership itself, as the server's `getUserLevel` computes it: the world's
  *   `compendiumConfiguration` override, else the pack's own, else the default (Player: Observer);
  *   the highest level of any role the user holds, Observer to read. A GM reads what the players
- *   read under `gmGaze` `player`, everything configured under `all`.
+ *   read.
  * - **The tools**: `search_rulebooks` (names first, then the text) and `read_rulebook` (one entry
  *   rendered whole: a spell's facts, a class's features by level, a feature's granting class, a
  *   rules page with the glossary entries it embeds). Their definitions are the same bytes for every
@@ -100,11 +100,10 @@ export function packLevel(pack, role, configuration = {}) {
 }
 
 /** Whether the user may read the pack: Observer, as the compendium sidebar opens it to them. */
-export function packOpenTo(pack, user, { gmGaze = "player", configuration = {} } = {}) {
+export function packOpenTo(pack, user, { configuration = {} } = {}) {
   const role = user?.role ?? ROLES.NONE;
-  if (role >= ROLES.ASSISTANT) {
-    return gmGaze === "all" || packLevel(pack, ROLES.PLAYER, configuration) >= LEVELS.OBSERVER;
-  }
+  if (role >= ROLES.ASSISTANT)
+    return packLevel(pack, ROLES.PLAYER, configuration) >= LEVELS.OBSERVER;
   return role >= ROLES.PLAYER && packLevel(pack, role, configuration) >= LEVELS.OBSERVER;
 }
 
@@ -928,7 +927,7 @@ export function createLibrary({
       const table = tableRulebooks(world, settings);
       if (!table.length) return null;
       const configuration = compendiumConfiguration(world);
-      const opts = { gmGaze: settings?.gmGaze, configuration };
+      const opts = { configuration };
       const mine = table.filter(p => packOpenTo(p, user, opts));
       const mineIds = new Set(mine.map(packIdOf));
       const packsById = new Map((world?.packs ?? []).map(p => [packIdOf(p), p]));

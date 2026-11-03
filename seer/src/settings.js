@@ -57,7 +57,6 @@ export const SETTING_DEFAULTS = Object.freeze({
   tableNotes: "",
   askers: "players",
   askerIds: "",
-  gmGaze: "player",
   modelLabel: "",
   rulebooks: DEFAULT_RULEBOOKS,
   rulebookLeaveOut: DEFAULT_LEAVE_OUT
@@ -85,7 +84,7 @@ function parse(value) {
 /**
  * The module's settings with defaults filled and types coerced.
  * @returns {{ enabled: boolean, serviceUrl: string, tableNotes: string, askers: "players" | "listed",
- *   askerIds: string[], gmGaze: "player" | "all", modelLabel: string, rulebooks: string[],
+ *   askerIds: string[], modelLabel: string, rulebooks: string[],
  *   rulebookLeaveOut: string[] }}
  */
 export function moduleSettings(world) {
@@ -112,7 +111,6 @@ export function moduleSettings(world) {
       .split(",")
       .map(id => id.trim())
       .filter(Boolean),
-    gmGaze: raw.gmGaze === "all" ? "all" : "player",
     modelLabel: typeof raw.modelLabel === "string" ? raw.modelLabel : "",
     rulebooks: listOf(raw.rulebooks),
     rulebookLeaveOut: listOf(raw.rulebookLeaveOut)

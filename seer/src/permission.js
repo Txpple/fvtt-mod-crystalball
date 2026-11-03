@@ -5,9 +5,11 @@
  * the world goes into a gaze. Pure: plain documents and a plain user in, a boolean out.
  *
  * Foundry's rule: a user's level on a document is `ownership[userId] ?? ownership.default`; an
- * embedded document's INHERIT (-1) takes its parent's level for that user; OBSERVER is 2. A GM
- * (role 3 Assistant or 4 Gamemaster) passes everything; the `gmGaze` world setting narrows that to
- * a player's view so the DM tests what the players get.
+ * embedded document's INHERIT (-1) takes its parent's level for that user; OBSERVER is 2. Foundry
+ * passes a GM (role 3 Assistant or 4 Gamemaster) everything; the ball does not. It is the players'
+ * tool, so a GM reads what every player reads plus what is granted to them by name, and the DM
+ * tests what the players get. The DM's own knowledge (the plot, the session plans) is not in the
+ * world anyway, and the DM's assistant is the MCP, which reads it all.
  */
 
 export const ROLES = Object.freeze({ NONE: 0, PLAYER: 1, TRUSTED: 2, ASSISTANT: 3, GAMEMASTER: 4 });
@@ -36,8 +38,8 @@ export function defaultLevelOf(doc, parent = null) {
 
 /**
  * The level granted to this user by name on the document (or on the parent, when the document
- * inherits), or null when nothing names them. A GM's explicit grants are what `gmGaze: "player"`
- * adds to the players' view.
+ * inherits), or null when nothing names them. A GM's explicit grants are what a GM reads beyond
+ * the players' view.
  */
 export function explicitLevelOf(doc, userId, parent = null) {
   const mine = stored(doc, userId);
@@ -55,13 +57,12 @@ export const isGM = user => (user?.role ?? 0) >= ROLES.ASSISTANT;
  * Whether a user may observe a document (a journal page passes its entry as `parent`).
  * @param {object} doc
  * @param {{ _id: string, role: number }} user
- * @param {{ gmGaze?: "player" | "all", parent?: object | null }} [options]
+ * @param {{ parent?: object | null }} [options]
  */
-export function canObserve(doc, user, { gmGaze = "player", parent = null } = {}) {
+export function canObserve(doc, user, { parent = null } = {}) {
   // A banned user (role 0) observes nothing, whatever the document grants.
   if (!doc || !user?._id || !((user.role ?? 0) >= ROLES.PLAYER)) return false;
   if (isGM(user)) {
-    if (gmGaze === "all") return true;
     return (
       defaultLevelOf(doc, parent) >= LEVELS.OBSERVER ||
       (explicitLevelOf(doc, user._id, parent) ?? LEVELS.NONE) >= LEVELS.OBSERVER
@@ -79,9 +80,8 @@ export const ownsExplicitly = (doc, userId) => stored(doc, userId) === LEVELS.OW
 
 /**
  * Whether the user would see a page's or an item's secret blocks (`<section class="secret">`):
- * Foundry enriches them for owners only, and a GM with the whole world in view.
+ * Foundry enriches them for owners only (a GM's own grant counts; Foundry's GM pass does not).
  */
-export function seesSecrets(doc, user, { gmGaze = "player", parent = null } = {}) {
-  if (isGM(user) && gmGaze === "all") return true;
+export function seesSecrets(doc, user, { parent = null } = {}) {
   return levelOf(doc, user?._id, parent) >= LEVELS.OWNER;
 }
