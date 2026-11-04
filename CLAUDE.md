@@ -188,11 +188,14 @@ the sandbox counted after a join and a relaunch, the walk GREEN with its new pre
 GM page's `user.active`); 1.0.12 deployed `--local`. The box's Seer at `v1.0.12` first, then the installer PASS on
 prod (a parallel Card Catalogue install interleaved with it; the Seer left and rejoined across both relaunches,
 counted); 19/19 served files byte-identical with the zip; `healthz` 1.0.12 and a forged id 401 through the public
-hostname. **On `main`, unreleased: the presence record** (the user: "yes jsut a join and leave record"):
-`presence.jsonl` beside the ledger, a line per join and leave of every user but the ball, from Foundry's own
-`userActivity` broadcast and the minute's list, a stint closed whenever the Seer loses sight; read on the box when the
-user asks, no report tool. `verify` green (419 tests); on the sandbox the bridge's join and leave landed live, to
-the second.
+hostname. **1.0.13 released and on prod: the presence record** (the user: "yes jsut a join and leave record", then
+"Yes, release and prod"): `presence.jsonl` beside the ledger, a line per join and leave of every user but the ball,
+from Foundry's own `userActivity` broadcast and the minute's list, a stint closed whenever the Seer loses sight; read
+on the box when the user asks, no report tool. `verify` green (419 tests); on the sandbox the bridge's join and leave
+landed live, to the second. The annotated `v1.0.13` through the reusable workflow, `latest` serving it; the box's
+Seer at `v1.0.13` first (its record opened), then the installer PASS on prod with only the bridge and the ball
+connected, 19/19 served files byte-identical with the zip; the record caught it: the bridge's join, its leave as
+`world-shutdown`, `lost`, and `watching` again when the Seer rejoined, counted.
 
 ## The rules this module keeps
 
