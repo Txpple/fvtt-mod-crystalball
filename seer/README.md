@@ -107,6 +107,13 @@ else `seer/data` in the clone (gitignored). Mode 0700 where the platform has mod
 - `usage.jsonl`: one line per model call: when, who, the model, the four token counts, the cost, a hash per
   layer, the latency, whether it was the stub, the outcome (`done`, `aborted` or `failed`) and `estimated` when
   the spend was worked out rather than reported. Counts and hashes, never words.
+- `presence.jsonl`: who was in the world when, for the DM's own audit: one line per `join` and `leave` of
+  every user but the ball (the MCP's bridge users included), each with the user's id and name and `how` it is
+  known: `live` from Foundry's own broadcast, to the second; `probe` from the minute's presence ask; `already`
+  when the user was on as the Seer started watching. A leave carries its join's time and the stint's minutes.
+  `watching` and `lost` lines mark when the Seer could see the world; losing it closes every open stint
+  (`world-shutdown` or `seer-lost`), so a stint never spans a gap. A Seer that crashes writes no `lost`, and
+  its next `watching` shows the gap. Ids and names, nothing else; read it on the box, it is never served.
 
 **The DM can read every sitting on the box**, and the window tells players so. What a player asks and the gaze it
 was answered from go to the Claude API under its terms.

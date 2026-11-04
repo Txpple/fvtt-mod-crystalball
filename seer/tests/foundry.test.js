@@ -11,6 +11,7 @@ import {
   sessionHash,
   socketOptions
 } from "../src/foundry.js";
+import { createPresence } from "../src/presence.js";
 import { FOUNDRY_BUILD, fakeIo, fixture, quietLog, until } from "./helpers.js";
 
 const URL_ = "http://foundry.test:30000";
@@ -31,6 +32,7 @@ function fakeFoundry() {
     joined: new Set(),
     worldOpen: true,
     counted: false,
+    others: [],
     joinReply: fixture("join-reply"),
     posts: [],
     gets: 0,
@@ -68,7 +70,7 @@ function fakeFoundry() {
         world: () => f.worldPayload,
         modifyDocument: request => f.packReply(request),
         worldStatus: true,
-        present: () => (f.counted ? [BALL] : [])
+        present: () => [...(f.counted ? [BALL] : []), ...f.others]
       };
     }
     if (cookie === ADA_SESSION)
@@ -392,6 +394,45 @@ describe("the link", () => {
     await until(() => ball.emitted.filter(e => e === "getUserActivity").length >= 3);
     expect(f.io.sockets.at(-1)).toBe(ball);
     expect(link.state()).toMatchObject({ connected: true, counted: true });
+  });
+
+  it("records who is on, Foundry's joins and leaves, and a world's shutdown", async () => {
+    const f = fakeFoundry();
+    f.others = ["playerAda0000001"];
+    const lines = [];
+    const presence = createPresence({ append: l => lines.push(l), log: quietLog() });
+    const { link } = linkFor(f, { presence });
+    link.start();
+    await until(() => lines.some(l => l.event === "join"));
+    const ball = f.io.sockets.at(-1);
+    ball.fire("userActivity", "playerBen0000001", { active: true });
+    ball.fire("userActivity", BALL, { active: true });
+    ball.fire("userActivity", "playerAda0000001", { cursor: null });
+    ball.fire("userActivity", "playerBen0000001", { active: false });
+    f.worldOpen = false;
+    ball.fire("shutdown", fixture("shutdown"));
+    await until(() => lines.some(l => l.event === "lost"));
+    expect(lines.map(l => [l.event, l.userName ?? l.reason ?? null, l.how ?? null])).toEqual([
+      ["watching", null, null],
+      ["join", "Ada", "already"],
+      ["join", "Ben", "live"],
+      ["leave", "Ben", "live"],
+      ["leave", "Ada", "world-shutdown"],
+      ["lost", "world shutdown", null]
+    ]);
+  });
+
+  it("catches a join the broadcast missed at the minute's ask", async () => {
+    const f = fakeFoundry();
+    const lines = [];
+    const presence = createPresence({ append: l => lines.push(l), log: quietLog() });
+    const { link } = linkFor(f, { presence, presenceMs: 20 });
+    link.start();
+    await until(() => lines.some(l => l.event === "watching"));
+    f.others = ["playerCy00000001"];
+    await until(() => lines.some(l => l.event === "join"));
+    expect(lines.at(-1)).toMatchObject({ userName: "Cy", how: "probe" });
+    expect(lines.some(l => l.userId === BALL)).toBe(false);
   });
 
   it("fails a world fetch at once when the world shuts down under it", async () => {

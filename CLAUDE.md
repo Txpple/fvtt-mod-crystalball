@@ -188,7 +188,11 @@ the sandbox counted after a join and a relaunch, the walk GREEN with its new pre
 GM page's `user.active`); 1.0.12 deployed `--local`. The box's Seer at `v1.0.12` first, then the installer PASS on
 prod (a parallel Card Catalogue install interleaved with it; the Seer left and rejoined across both relaunches,
 counted); 19/19 served files byte-identical with the zip; `healthz` 1.0.12 and a forged id 401 through the public
-hostname.
+hostname. **On `main`, unreleased: the presence record** (the user: "yes jsut a join and leave record"):
+`presence.jsonl` beside the ledger, a line per join and leave of every user but the ball, from Foundry's own
+`userActivity` broadcast and the minute's list, a stint closed whenever the Seer loses sight; read on the box when the
+user asks, no report tool. `verify` green (419 tests); on the sandbox the bridge's join and leave landed live, to
+the second.
 
 ## The rules this module keeps
 

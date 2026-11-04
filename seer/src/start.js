@@ -1,6 +1,6 @@
 /**
  * The Seer started: the config, the data directory, the ledger and the limits seeded from it,
- * the sittings and their daily sweep, the model, the Foundry link, the HTTP server, and a clean
+ * the sittings and their daily sweep, the presence record, the model, the Foundry link, the HTTP server, and a clean
  * shutdown on SIGINT and SIGTERM. main.js loads this once it has checked the Node version.
  */
 
@@ -12,6 +12,7 @@ import { createLedger } from "./ledger.js";
 import { createLimits } from "./limits.js";
 import { enabled, log, setLevel } from "./log.js";
 import { createModel } from "./model.js";
+import { createPresence, presenceFile } from "./presence.js";
 import { createLibrary } from "./rulebooks.js";
 import { createSittings, ensureDir } from "./sittings.js";
 
@@ -57,7 +58,8 @@ export async function start() {
     url: env.foundryUrl,
     user: env.ballUser,
     password: env.ballPassword,
-    log
+    log,
+    presence: createPresence({ append: presenceFile(env.dataDir).append, log })
   });
   const library = createLibrary({ link, log });
 

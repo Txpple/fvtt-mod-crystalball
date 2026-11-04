@@ -20,7 +20,10 @@
  *   only when a socket connects), so the ball leaves on `shutdown` and rejoins on a new socket.
  * - **Presence**: `getUserActivity` answers on the asking socket alone with a `userActivity` event
  *   per user Foundry counts present; `getWorldStatus`, asked after it, acknowledges after them all.
- *   Asked at each join and every minute: a ball Foundry does not count rejoins.
+ *   Asked at each join and every minute: a ball Foundry does not count rejoins. Foundry also
+ *   emits `userActivity` to every socket with `active: true` when a user's first socket connects
+ *   and `active: false` when their last one goes (`components/activity.mjs`): with the minute's
+ *   list, that is the presence record's join and leave (`presence.js`).
  *
  * - **A pack's documents**: `modifyDocument` with `{ type, action: "get", operation: { pack,
  *   query: {} } }`, as the client's own `getDocuments` asks; the acknowledgement's `result` holds
@@ -37,6 +40,7 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import { io as socketIo } from "socket.io-client";
+import { noPresence } from "./presence.js";
 
 /** Foundry's session ids are random alphanumerics (24 on 14.369). */
 export const SESSION_ID = /^[A-Za-z0-9]{8,64}$/;
@@ -231,9 +235,10 @@ function limiter(size) {
  * The link.
  * @param {{ url: string, user: string, password: string, log: object, io?: Function,
  *   request?: Function, now?: () => number, worldTtlMs?: number, negativeTtlMs?: number,
- *   minBackoffMs?: number, maxBackoffMs?: number, presenceMs?: number }} options  `now` is a
- *   monotonic clock in ms, so a wall-clock change never stretches or cuts a cache; `presenceMs` is
- *   how often Foundry is asked whether it counts the ball
+ *   minBackoffMs?: number, maxBackoffMs?: number, presenceMs?: number, presence?: object }} options
+ *   `now` is a monotonic clock in ms, so a wall-clock change never stretches or cuts a cache;
+ *   `presenceMs` is how often Foundry is asked whether it counts the ball; `presence` is the
+ *   recorder the users Foundry counts present are told to (none by default)
  */
 export function createLink({
   url,
@@ -247,7 +252,8 @@ export function createLink({
   negativeTtlMs = 30000,
   minBackoffMs = 1000,
   maxBackoffMs = 15000,
-  presenceMs = 60000
+  presenceMs = 60000,
+  presence = noPresence
 }) {
   const where = foundryAddress(url);
   const state = { connected: false, worldOpen: false, world: null, ballUser: null, counted: null };
@@ -260,6 +266,7 @@ export function createLink({
   let stopped = true;
   let running = false;
   let checking = false;
+  let asking = false;
   let cache = { at: 0, data: null };
   let inflight = null;
   const memo = new Map();
@@ -271,8 +278,9 @@ export function createLink({
     Cookie: `session=${c}`
   });
 
-  const teardown = () => {
+  const teardown = (reason = "disconnected") => {
     const s = socket;
+    presence.lost(reason);
     socket = null;
     state.connected = false;
     state.counted = null;
@@ -301,9 +309,11 @@ export function createLink({
    * rejoin; the teardown here is for a socket that fires no event when it is disconnected.
    */
   const leave = (s, reason) => {
+    // Before the disconnect, whose own handler would close the record with its reason instead.
+    if (socket === s) presence.lost(reason);
     s.disconnect();
     if (socket === s) {
-      teardown();
+      teardown(reason);
       schedule(reason);
     }
   };
@@ -314,25 +324,39 @@ export function createLink({
    * `getWorldStatus`, asked after it, comes after them all, since one connection keeps its order.
    */
   async function countedOn(s) {
-    let seen = false;
+    const ids = new Set();
     const onActivity = (id, data) => {
-      if (id === ballId && data?.active !== false) seen = true;
+      if (typeof id === "string" && data?.active !== false) ids.add(id);
     };
     s.on("userActivity", onActivity);
+    asking = true;
     try {
       s.emit("getUserActivity");
       await ask(s, "getWorldStatus", 10000);
-      return seen;
+      const seen = ids.has(ballId);
+      ids.delete(ballId);
+      return { seen, others: [...ids] };
     } finally {
+      asking = false;
       s.off?.("userActivity", onActivity);
     }
+  }
+
+  /** Whose names the record lacks are learnt from a fresh world payload before it is written. */
+  async function learnNames(ids) {
+    if (presence.unknown(ids).length) await fetchWorld().catch(() => null);
   }
 
   /** Foundry's answer into the state: true, false, or null when it could not be asked. */
   async function checkPresence(s) {
     try {
-      const counted = await countedOn(s);
+      const at = new Date();
+      const { seen: counted, others } = await countedOn(s);
       if (socket === s) state.counted = counted;
+      if (socket === s) {
+        await learnNames(others);
+        if (socket === s) presence.seen(others, at);
+      }
       return counted;
     } catch (err) {
       if (socket === s) log.warn("foundry: the presence check failed", { error: reasonOf(err) });
@@ -404,6 +428,7 @@ export function createLink({
         throw new Error("world-closed: Foundry has no world running");
       }
       state.world = data.world.id ?? null;
+      presence.names(data.users);
       const found = findUser(data.users, user);
       if (!found) throw new Error(`the ball's user "${user}" is not in the world`);
       ballId = found._id;
@@ -425,10 +450,18 @@ export function createLink({
     state.connected = true;
     state.worldOpen = true;
     backoff = minBackoffMs;
+    // Foundry's own join and leave of every other user; a presence ask's answers are its own.
+    s.on("userActivity", (id, data) => {
+      if (socket !== s || asking || id === ballId || typeof data?.active !== "boolean") return;
+      const at = new Date();
+      if (data.active && presence.unknown([id]).length)
+        void learnNames([id]).then(() => presence.live(id, data, at));
+      else presence.live(id, data, at);
+    });
     s.on("disconnect", reason => {
       if (socket !== s) return;
       log.warn("foundry: the ball's socket dropped", { reason: String(reason) });
-      teardown();
+      teardown(`disconnected: ${reason}`);
       schedule(`disconnected: ${reason}`);
     });
     s.on("shutdown", () => {
@@ -457,7 +490,7 @@ export function createLink({
     try {
       await connectOnce();
     } catch (err) {
-      teardown();
+      teardown("not connected");
       if (/world-closed/.test(err?.message ?? "")) state.worldOpen = false;
       const reason = reasonOf(err);
       log.warn("foundry: not connected", { error: reason });
@@ -475,11 +508,12 @@ export function createLink({
     if (!data?.userId) {
       // `{}` answers a session that no longer belongs to the running world: closed or restarted.
       state.worldOpen = false;
-      teardown();
+      teardown("world payload empty");
       schedule("world payload empty");
       return null;
     }
     cache = { at: now(), data };
+    presence.names(data.users);
     state.world = data.world?.id ?? state.world;
     state.worldOpen = true;
     return data;
@@ -510,7 +544,7 @@ export function createLink({
       timer = null;
       clearInterval(watch);
       watch = null;
-      teardown();
+      teardown("seer stopped");
     },
 
     /** What healthz reports; `counted` is Foundry's last word on the ball's presence, null unasked. */

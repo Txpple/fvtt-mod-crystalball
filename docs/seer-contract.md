@@ -279,6 +279,9 @@ probe is asked on every request; only a refusal is remembered, for 30 seconds, i
   (`id, { active, … }`) for each user Foundry counts present; `socket.emit("getWorldStatus", callback)`, asked after
   it, is acknowledged after them all (one connection keeps its order). The Seer asks at each join and every minute
   (`healthz`'s `counted`); a ball Foundry does not count leaves and rejoins on a new socket, which Foundry counts.
+  Foundry also emits `userActivity` to every socket, `{ active: true }` when a user's first socket connects and
+  `{ active: false }` when their last one goes (`components/activity.mjs`); a player's own activity carries no
+  `active`. With the minute's list, these make the presence record (`presence.jsonl`, the Seer's README).
 - **World**: `socket.emit("world", callback)` → the payload with `users`, `actors`, `items`, `journal`, `folders`,
   `settings`, `messages`, … (every document, unfiltered) plus `userId`.
 - **A pack's documents**: `socket.emit("modifyDocument", { type: "<JournalEntry | Item>", action: "get", operation:
